@@ -1,0 +1,13 @@
+name = "CartesianGeometry"
+uuid = "5961ddb3-e46d-41f1-806c-0197ba873d0b"
+authors = ["Vincent Le Chenadec <vincentlechenadec@gmail.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
