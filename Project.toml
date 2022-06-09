@@ -3,6 +3,9 @@ uuid = "5961ddb3-e46d-41f1-806c-0197ba873d0b"
 authors = ["Vincent Le Chenadec <vincentlechenadec@gmail.com> and contributors"]
 version = "0.1.0"
 
+[deps]
+Vofinit = "1beee101-8e09-4165-b3f9-a3e33534e38b"
+
 [compat]
 julia = "1"
 
