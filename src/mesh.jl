@@ -1,3 +1,4 @@
+# First and last points on boundaries
 function mesh(f, outer, inner)
     x = Vector{Float64}(undef, length(outer))
 
@@ -10,3 +11,5 @@ function mesh(f, outer, inner)
 
     x
 end
+
+# First and last points half a point away from boundaries
