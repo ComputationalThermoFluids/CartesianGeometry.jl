@@ -1,6 +1,6 @@
-const edge = Val{true}
-const center = Val{false}
-
+#const edge = Val{true}
+#const center = Val{false}
+#
 # First and last points on boundaries
 function mesh(::Type{Val{true}}, f, outer, inner)
     x = Vector{Float64}(undef, length(outer))

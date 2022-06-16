@@ -8,14 +8,16 @@ using Vofinit
 const ArrayAbstract{N,T} = AbstractArray{T,N}
 
 export HyperSphere
-export edge, center, mesh
+export mesh
 export Dirichlet, apply!
 export integrate
+export getsurface
 
 include("utils.jl")
 include("zoo.jl")
 include("mesh.jl")
 include("border.jl")
 include("volume.jl")
+include("surface.jl")
 
 end

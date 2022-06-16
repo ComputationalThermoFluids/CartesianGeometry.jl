@@ -9,6 +9,11 @@ isnonpositive(x) = x ≤ zero(x)
 Return the indices of the elements of `subset` in `collection`. Return `nothing` if one or
 more values is not in `collection`.
 
+# Related PR and issues
+
+- <https://github.com/JuliaLang/julia/pull/24673>
+- <https://github.com/JuliaLang/julia/issues/30368>
+
 """
 function findin(subset::AbstractUnitRange, collection::AbstractUnitRange)
     start = findfirst(isequal(first(subset)), collection)

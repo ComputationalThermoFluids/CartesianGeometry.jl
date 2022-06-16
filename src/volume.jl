@@ -22,61 +22,25 @@ function integrate!(v, coor, f, xyz, ranges)
     v, coor
 end
 
-function _integrate!(v::ArrayAbstract{1}, coor::ArrayAbstract{1},
-                     f, xyz, outer)
-    (x,) = xyz
+@generated function _integrate!(v::ArrayAbstract{N}, coor::ArrayAbstract{N},
+                                f, xyz, outer) where {N}
+    quote
+        @ntuple($N, x) = xyz
 
-    outer = CartesianIndices(outer)
+        outer = CartesianIndices(outer)
 
-    xex = zeros(Cdouble, 4)
+        xex = zeros(Cdouble, 4)
 
-    for mnp in outer
-        (m,) = Tuple(mnp)
+        for index in outer
+            @ntuple($N, i) = Tuple(index)
+            @nextract($N, y, d -> SVector(x_d[i_d], x_d[i_d+1]))
 
-        v[m] = _cell_integrate!(xex, f, SVector(x[m], x[m+1]))
-        coor[m] = SVector(xex[1])
+            @nref($N, v, i) = @ncall($N, _cell_integrate!, xex, f, y)
+            @nref($N, coor, i) = @ncall($N, SVector, d -> xex[d])
+        end
+
+        v
     end
-
-    v
-end
-
-function _integrate!(v::ArrayAbstract{2}, coor::ArrayAbstract{2},
-                     f, xyz, outer)
-    (x, y) = xyz
-
-    outer = CartesianIndices(outer)
-
-    xex = zeros(Cdouble, 4)
-
-    for mnp in outer
-        (m, n) = Tuple(mnp)
-
-        v[m, n] = _cell_integrate!(xex, f, SVector(x[m], x[m+1]),
-                                           SVector(y[n], y[n+1]))
-        coor[m, n] = SVector(xex[1], xex[2])
-    end
-
-    v
-end
-
-function _integrate!(v::ArrayAbstract{3}, coor::ArrayAbstract{3},
-                     f, xyz, outer)
-    (x, y, z) = xyz
-
-    outer = CartesianIndices(outer)
-
-    xex = zeros(Cdouble, 4)
-
-    for mnp in outer
-        (m, n, p) = Tuple(mnp)
-
-        v[m, n, p] = _cell_integrate!(xex, f, SVector(x[m], x[m+1]),
-                                              SVector(y[n], y[n+1]),
-                                              SVector(z[p], z[p+1]))
-        coor[m, n, p] = SVector(xex[1], xex[2], xex[3])
-    end
-
-    v
 end
 
 """
@@ -89,16 +53,16 @@ end
 function _cell_integrate!(xex, f, x)
     t = SVector{2}(f(i) for i in x)
 
-    vol = x[2] - x[1]
+    val = x[2] - x[1]
 
     if all(isnonpositive, t)
         xex[1] = sum(x) / 2
-        return vol
+        return val
     end
 
     if all(isnonnegative, t)
         xex[1] = sum(x) / 2
-        return zero(vol)
+        return zero(val)
     end
 
     ξ = (x[2] * t[1] - x[1] * t[2]) / (t[1] - t[2])
@@ -119,47 +83,47 @@ end
 function _cell_integrate!(xex, f, x, y)
     t = SMatrix{2,2}(f(i, j) for i in x, j in y)
 
-    vol = (x[2] - x[1]) * (y[2] - y[1])
+    val = (x[2] - x[1]) * (y[2] - y[1])
 
     if all(isnonpositive, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
-        return vol
+        return val
     end
 
     if all(isnonnegative, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
-        return zero(vol)
+        return zero(val)
     end
 
-    x0 = Cdouble.((x[1], y[1], zero(vol)))
-    h0 = Cdouble.((x[2]-x[1], y[2]-y[1], one(vol)))
+    x0 = Cdouble.((x[1], y[1], zero(val)))
+    h0 = Cdouble.((x[2]-x[1], y[2]-y[1], one(val)))
 
-    vol * getcc(f, x0, h0, xex, Cint(2); nex=Cint.((1, 0)))
+    val * getcc(f, x0, h0, xex, Cint(2); nex=Cint.((1, 0)))
 end
 
 function _cell_integrate!(xex, f, x, y, z)
     t = SArray{Tuple{2,2,2}}(f(i, j, k) for i in x, j in y, k in z)
 
-    vol = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1])
+    val = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1])
 
     if all(isnonpositive, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
         xex[3] = sum(z) / 2
-        return vol
+        return val
     end
 
     if all(isnonnegative, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
         xex[3] = sum(z) / 2
-        return zero(vol)
+        return zero(val)
     end
 
     x0 = Cdouble.((x[1], y[1], z[1]))
     h0 = Cdouble.((x[2]-x[1], y[2]-y[1], z[2]-z[1]))
 
-    vol * getcc(f, x0, h0, xex, Cint(3); nex=Cint.((1, 0)))
+    val * getcc(f, x0, h0, xex, Cint(3); nex=Cint.((1, 0)))
 end
