@@ -21,5 +21,6 @@ include("border.jl")
 include("volume.jl")
 include("volume2.jl")
 include("surface.jl")
+include("surface2.jl")
 
 end
