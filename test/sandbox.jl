@@ -23,3 +23,4 @@ apply!(coor, Dirichlet(SVector{length(xyz),eltype(eltype(coor))}, xyz2, ranges))
 
 ranges = (; outer, stagger, center)
 a = getsurface(levelset, xyz, ranges)
+w = getvolume(levelset, xyz, coor, ranges)
