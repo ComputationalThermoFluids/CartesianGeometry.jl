@@ -37,12 +37,12 @@ end
 levelset = HyperSphere(0.25, 0.5 .* one.(eltype.(xyz)))
 
 v = CartesianArray{SVector{length(outer)+1,T}}(undef, outer)
-integrate!(v, Tuple{0}, levelset, xyz)
+integrate!(v, Tuple{0}, levelset, xyz, outer)
 
 a = CartesianArray{T}(undef, (outer..., OneTo(length(outer))))
 integrate!(a, Tuple{1}, levelset, xyz, outers)
 
-b = CartesianArray{T}(undef, (outer..., OneTo(length(outer))))
+#b = CartesianArray{T}(undef, (outer..., OneTo(length(outer))))
 #integrate!(b, Tuple{1}, levelset, xyz, v, outer)
 
 #= from here

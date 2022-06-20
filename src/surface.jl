@@ -4,98 +4,79 @@ product(node::NTuple{N}, center::NTuple{N}) where {N} = ntuple(N) do i
 end
 
 =#
-function integrate!(mom, ::Type{Tuple{1}}, f, xyz, faces)
-    nodes = map(faces) do el
-        findin.(el, only.(getranges.(xyz, 1)))
-    end
+#function integrate!(mom, ::Type{Tuple{1}}, f, xyz, faces)
+#=
+function integrate!(mom, ::Type{Tuple{1}}, f, xyz, ranges)
+    reshaped = reshape(mom)
     xyz = reshape.(xyz)
 
-    faces = map(faces) do el
-        findin.(el, front(getranges(mom, 1)))
-    end
-    reshaped = reshape(mom)
-
-    _integrate!(reshaped, Tuple{1}, f, xyz, nodes, faces)
+    _integrate!(reshaped, Tuple{1}, f, xyz, ranges)
 
     mom
 end
+=#
 
 function _integrate!(mom::ArrayAbstract{2}, ::Type{Tuple{1}},
-                     f, xyz, nodes, faces) where {N}
+                     f, xyz, ranges)
     (x,) = xyz
 
     xex = zeros(Cdouble, 4)
 
-    nodes = CartesianIndices.(nodes)
-    faces = CartesianIndices.(faces)
+    indices = CartesianIndices.(ranges)
 
-    for (nind, find) in zip(nodes[1], faces[1])
-        (m,) = Tuple(nind)
-        (i,) = Tuple(find)
-
-        mom[i, 1] = _getpoint!(xex, f, x[m])
+    for index in indices[1]
+        (i,) = Tuple(index)
+        mom[i, 1] = _getpoint!(xex, f, x[i])
     end
 
     mom
 end
 
 function _integrate!(mom::ArrayAbstract{3}, ::Type{Tuple{1}},
-                     f, xyz, nodes, faces) where {N}
+                     f, xyz, ranges)
     (x, y) = xyz
 
     xex = zeros(Cdouble, 4)
 
-    nodes = CartesianIndices.(nodes)
-    faces = CartesianIndices.(faces)
+    indices = CartesianIndices.(ranges)
 
-    for (nind, find) in zip(nodes[1], faces[1])
-        (m, n) = Tuple(nind)
-        (i, j) = Tuple(find)
-
-        mom[i, j, 1] = _getlength!(xex, f, x[m], SVector(y[n], y[n+1]))
+    for index in indices[1]
+        (i, j) = Tuple(index)
+        mom[i, j, 1] = _getlength!(xex, f, x[i], SVector(y[j], y[j+1]))
     end
 
-    for (nind, find) in zip(nodes[2], faces[2])
-        (m, n) = Tuple(nind)
-        (i, j) = Tuple(find)
-
-        mom[i, j, 2] = _getlength!(xex, f, SVector(x[m], x[m+1]), y[n])
+    for index in indices[2]
+        (i, j) = Tuple(index)
+        mom[i, j, 2] = _getlength!(xex, f, SVector(x[i], x[i+1]), y[j])
     end
 
     mom
 end
 
 function _integrate!(mom::ArrayAbstract{4}, ::Type{Tuple{1}},
-                     f, xyz, nodes, faces) where {N}
+                     f, xyz, ranges)
     (x, y, z) = xyz
 
     xex = zeros(Cdouble, 4)
 
-    nodes = CartesianIndices.(nodes)
-    faces = CartesianIndices.(faces)
+    indices = CartesianIndices.(ranges)
 
-    for (nind, find) in zip(nodes[1], faces[1])
-        (m, n, p) = Tuple(nind)
-        (i, j, k) = Tuple(find)
-
-        mom[i, j, k, 1] = _getarea!(xex, f, x[m], SVector(y[n], y[n+1]),
-                                                SVector(z[p], z[p+1]))
+    for index in indices[1]
+        (i, j, k) = Tuple(index)
+        mom[i, j, k, 1] = _getarea!(xex, f, x[i], SVector(y[j], y[j+1]),
+                                                  SVector(z[k], z[k+1]))
     end
 
-    for (nind, find) in zip(nodes[2], faces[2])
-        (m, n, p) = Tuple(nind)
-        (i, j, k) = Tuple(find)
-
-        mom[i, j, k, 2] = _getarea!(xex, f, SVector(x[m], x[m+1]), y[n],
-                                          SVector(z[p], z[p+1]))
+    for index in indices[2]
+        (i, j, k) = Tuple(index)
+        mom[i, j, k, 2] = _getarea!(xex, f, SVector(x[i], x[i+1]), y[j],
+                                            SVector(z[k], z[k+1]))
     end
 
-    for (nind, find) in zip(nodes[3], faces[3])
-        (m, n, p) = Tuple(nind)
-        (i, j, k) = Tuple(find)
-
-        mom[m, n, p, 3] = _getarea!(xex, f, SVector(x[m], x[m+1]),
-                                          SVector(y[n], y[n+1]), z[p])
+    for ind in indices[3]
+        (i, j, k) = Tuple(index)
+        mom[i, j, k, 3] = _getarea!(xex, f, SVector(x[i], x[i+1]),
+                                            SVector(y[j], y[j+1]), z[k])
     end
 
     mom

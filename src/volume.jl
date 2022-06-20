@@ -37,36 +37,31 @@ end
 
 =#
 
-function integrate!(mom, ::Type{Tuple{0}}, f, xyz, ranges=getranges(mom, 1))
-    center = findin.(ranges, getranges(mom, 1))
+function integrate!(mom, ::Type{Tuple{P}}, f, xyz, ranges) where {P}
     reshaped = reshape(mom)
-
-    node = findin.(ranges, only.(getranges.(xyz, 1)))
     xyz = reshape.(xyz)
 
-    _integrate!(reshaped, Tuple{0}, f, xyz, node, center)
+    _integrate!(reshaped, Tuple{P}, f, xyz, ranges)
 
     mom
 end
 
 @generated function _integrate!(mom::ArrayAbstract{N}, ::Type{Tuple{0}},
-                                f, xyz, node, center) where {N}
+                                f, xyz, ranges) where {N}
     quote
         @ntuple($N, x) = xyz
 
-        node = CartesianIndices(node)
-        center = CartesianIndices(center)
+        indices = CartesianIndices(ranges)
 
         xex = zeros(Cdouble, 4)
 
-        for (nind, cind) in zip(node, center)
-            @ntuple($N, n) = Tuple(nind)
-            @ntuple($N, c) = Tuple(cind)
+        for index in indices
+            @ntuple($N, i) = Tuple(index)
 
-            @nextract($N, y, d -> SVector(x_d[n_d], x_d[n_d+1]))
+            @nextract($N, y, d -> SVector(x_d[i_d], x_d[i_d+1]))
 
             vol = @ncall($N, _vofi_integrate!, xex, f, y)
-            @nref($N, mom, c) = @ncall($N, SVector, vol, d -> xex[d])
+            @nref($N, mom, i) = @ncall($N, SVector, vol, d -> xex[d])
         end
 
         mom
