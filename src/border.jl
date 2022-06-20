@@ -39,3 +39,18 @@ end
         v
     end
 end
+
+#=
+struct Dirichlet2{F}
+    f::F
+
+    Dirichlet2(f::F) where {F} = new{F}(f)
+    Dirichlet2(f::Type{F}) where {F} = new{Type{F}}(f)
+end
+
+homogeneous(args...) = zero(mapreduce(eltype, promote_type, args))
+measure(args::SVector{2}...) = mapreduce(*, args) do el
+    el[2] - el[1]
+end
+
+=#

@@ -4,13 +4,16 @@ using Base.Cartesian
 using StaticArrays
 using TiledIteration
 using Vofinit
+using CartesianArrays
 
-const ArrayAbstract{N,T} = AbstractArray{T,N}
+import Base: front, Fix1
+import Base: getindex
 
 export HyperSphere
-export mesh
+#export mesh
+export staggered, centered
 export Dirichlet, apply!
-export integrate
+export integrate!#integrate
 export getvolume
 export getsurface
 

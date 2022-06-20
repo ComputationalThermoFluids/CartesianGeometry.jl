@@ -1,56 +1,116 @@
-function integrate(f, xyz, ranges)
-    (; outer) = ranges
-    v = Vector{Float64}(undef, prod(length.(outer)))
-    coor = Vector{SVector{length(outer),Float64}}(undef, prod(length.(outer)))
-    integrate!(v, coor, f, xyz, ranges)
+#=
+"""
+
+- `xyz`: abscissas of staggered edges;
+- `stagger`, `center`: outer ranges;
+- `inner`: centered inner range.
+
+"""
+function integrate(::Type{Tuple{0,1}}, f, xyz, stagger, center, inner)
+    d = length(center)
+    n = prod(length.(center))
+
+    mom = (Vector{Float64}(undef, n),
+           Vector{SVector{d,Float64}}(undef, n))
+
+    integrate!(mom, f, xyz, stagger, center, inner)
 end
 
-function integrate!(v, coor, f, xyz, ranges)
-    (; outer, inner) = ranges
+function integrate!(mom, f, xyz, stagger, center, inner)
+    dims = length.(center)
 
-    rv = reshape(v, length.(outer)...)
-    rcoor = reshape(coor, length.(outer)...)
-
-    xyz = map(xyz, outer) do x, rng
-        reshape(x, length(rng))
+    rmom = map(mom) do el
+        reshape(el, dims...)
     end
 
-    outer = findin.(inner, outer)
+    rxyz = map(xyz, stagger) do el, range
+        reshape(el, length(range))
+    end
 
-    _integrate!(rv, rcoor, f, xyz, outer)
+    stagger = findin.(inner, stagger)
+    center = findin.(inner, center)
 
-    v, coor
+    _integrate!(rmom, f, rxyz, stagger, center)
+
+    mom
 end
 
-@generated function _integrate!(v::ArrayAbstract{N}, coor::ArrayAbstract{N},
-                                f, xyz, outer) where {N}
+=#
+
+function integrate!(mom, ::Type{Tuple{0}}, f, xyz, ranges=getranges(mom, 1))
+    center = findin.(ranges, getranges(mom, 1))
+    reshaped = reshape(mom)
+
+    node = findin.(ranges, only.(getranges.(xyz, 1)))
+    xyz = reshape.(xyz)
+
+    _integrate!(reshaped, Tuple{0}, f, xyz, node, center)
+
+    mom
+end
+
+@generated function _integrate!(mom::ArrayAbstract{N}, ::Type{Tuple{0}},
+                                f, xyz, node, center) where {N}
     quote
         @ntuple($N, x) = xyz
 
-        outer = CartesianIndices(outer)
+        node = CartesianIndices(node)
+        center = CartesianIndices(center)
 
         xex = zeros(Cdouble, 4)
 
-        for index in outer
-            @ntuple($N, i) = Tuple(index)
-            @nextract($N, y, d -> SVector(x_d[i_d], x_d[i_d+1]))
+        for (nind, cind) in zip(node, center)
+            @ntuple($N, n) = Tuple(nind)
+            @ntuple($N, c) = Tuple(cind)
 
-            @nref($N, v, i) = @ncall($N, _cell_integrate!, xex, f, y)
-            @nref($N, coor, i) = @ncall($N, SVector, d -> xex[d])
+            @nextract($N, y, d -> SVector(x_d[n_d], x_d[n_d+1]))
+
+            vol = @ncall($N, _vofi_integrate!, xex, f, y)
+            @nref($N, mom, c) = @ncall($N, SVector, vol, d -> xex[d])
         end
 
-        v
+        mom
     end
 end
 
+#=
+@generated function _integrate!(mom::NTuple{2,ArrayAbstract{N}},
+                                f, xyz, stagger, center) where {N}
+    quote
+        (volume, centroid) = mom
+        @ntuple($N, x) = xyz
+
+        stagger = CartesianIndices(stagger)
+        center = CartesianIndices(center)
+
+        xex = zeros(Cdouble, 4)
+
+        for (sind, cind) in zip(stagger, center)
+            @ntuple($N, s) = Tuple(sind)
+            @ntuple($N, c) = Tuple(cind)
+
+            @nextract($N, y, d -> SVector(x_d[s_d], x_d[s_d+1]))
+
+            @nref($N, volume, c) = @ncall($N, _vofi_integrate!, xex, f, y)
+            @nref($N, centroid, c) = @ncall($N, SVector, d -> xex[d])
+        end
+
+        mom
+    end
+end
+
+=#
+
 """
 
-!!! note
+1d implementation complies with Vofi 2.0's API (see 2d and 3d).
+
+!!! note "Convention"
 
     Even if cell is empty, return full centroid coordinates.
 
 """
-function _cell_integrate!(xex, f, x)
+function _vofi_integrate!(xex, f, x)
     t = SVector{2}(f(i) for i in x)
 
     val = x[2] - x[1]
@@ -80,7 +140,12 @@ function _cell_integrate!(xex, f, x)
     nothing
 end
 
-function _cell_integrate!(xex, f, x, y)
+"""
+
+Call Vofi 2.0 for exact integration.
+
+"""
+function _vofi_integrate!(xex, f, x, y)
     t = SMatrix{2,2}(f(i, j) for i in x, j in y)
 
     val = (x[2] - x[1]) * (y[2] - y[1])
@@ -103,7 +168,12 @@ function _cell_integrate!(xex, f, x, y)
     val * getcc(f, x0, h0, xex, Cint(2); nex=Cint.((1, 0)))
 end
 
-function _cell_integrate!(xex, f, x, y, z)
+"""
+
+Call Vofi 2.0 for exact integration.
+
+"""
+function _vofi_integrate!(xex, f, x, y, z)
     t = SArray{Tuple{2,2,2}}(f(i, j, k) for i in x, j in y, k in z)
 
     val = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1])

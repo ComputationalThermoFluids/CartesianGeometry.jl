@@ -1,3 +1,107 @@
+#=
+product(node::NTuple{N}, center::NTuple{N}) where {N} = ntuple(N) do i
+    ntuple(d -> d==i ? node[i] : center[i])
+end
+
+=#
+function integrate!(mom, ::Type{Tuple{1}}, f, xyz, faces)
+    nodes = map(faces) do el
+        findin.(el, only.(getranges.(xyz, 1)))
+    end
+    xyz = reshape.(xyz)
+
+    faces = map(faces) do el
+        findin.(el, front(getranges(mom, 1)))
+    end
+    reshaped = reshape(mom)
+
+    _integrate!(reshaped, Tuple{1}, f, xyz, nodes, faces)
+
+    mom
+end
+
+function _integrate!(mom::ArrayAbstract{2}, ::Type{Tuple{1}},
+                     f, xyz, nodes, faces) where {N}
+    (x,) = xyz
+
+    xex = zeros(Cdouble, 4)
+
+    nodes = CartesianIndices.(nodes)
+    faces = CartesianIndices.(faces)
+
+    for (nind, find) in zip(nodes[1], faces[1])
+        (m,) = Tuple(nind)
+        (i,) = Tuple(find)
+
+        mom[i, 1] = _getpoint!(xex, f, x[m])
+    end
+
+    mom
+end
+
+function _integrate!(mom::ArrayAbstract{3}, ::Type{Tuple{1}},
+                     f, xyz, nodes, faces) where {N}
+    (x, y) = xyz
+
+    xex = zeros(Cdouble, 4)
+
+    nodes = CartesianIndices.(nodes)
+    faces = CartesianIndices.(faces)
+
+    for (nind, find) in zip(nodes[1], faces[1])
+        (m, n) = Tuple(nind)
+        (i, j) = Tuple(find)
+
+        mom[i, j, 1] = _getlength!(xex, f, x[m], SVector(y[n], y[n+1]))
+    end
+
+    for (nind, find) in zip(nodes[2], faces[2])
+        (m, n) = Tuple(nind)
+        (i, j) = Tuple(find)
+
+        mom[i, j, 2] = _getlength!(xex, f, SVector(x[m], x[m+1]), y[n])
+    end
+
+    mom
+end
+
+function _integrate!(mom::ArrayAbstract{4}, ::Type{Tuple{1}},
+                     f, xyz, nodes, faces) where {N}
+    (x, y, z) = xyz
+
+    xex = zeros(Cdouble, 4)
+
+    nodes = CartesianIndices.(nodes)
+    faces = CartesianIndices.(faces)
+
+    for (nind, find) in zip(nodes[1], faces[1])
+        (m, n, p) = Tuple(nind)
+        (i, j, k) = Tuple(find)
+
+        mom[i, j, k, 1] = _getarea!(xex, f, x[m], SVector(y[n], y[n+1]),
+                                                SVector(z[p], z[p+1]))
+    end
+
+    for (nind, find) in zip(nodes[2], faces[2])
+        (m, n, p) = Tuple(nind)
+        (i, j, k) = Tuple(find)
+
+        mom[i, j, k, 2] = _getarea!(xex, f, SVector(x[m], x[m+1]), y[n],
+                                          SVector(z[p], z[p+1]))
+    end
+
+    for (nind, find) in zip(nodes[3], faces[3])
+        (m, n, p) = Tuple(nind)
+        (i, j, k) = Tuple(find)
+
+        mom[m, n, p, 3] = _getarea!(xex, f, SVector(x[m], x[m+1]),
+                                          SVector(y[n], y[n+1]), z[p])
+    end
+
+    mom
+end
+
+#=
 function getsurface(f, xyz, ranges)
     (; outer) = ranges
     a = Vector{Float64}(undef, length(outer) * prod(length.(outer)))
@@ -100,6 +204,8 @@ function _getsurface!(a::ArrayAbstract{4}, f, xyz, stagger, center)
 
     a
 end
+
+=#
 
 function _getpoint!(xex, f, x)
     t = f(x)
