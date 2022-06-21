@@ -25,21 +25,21 @@ end
 
 xyz = map(infinite, node) do o, i
     a = staggered(identity, o, i)
-    CartesianArray(a, tuple(o))
+    CVector(a, tuple(o))
 end
 
 xyz_ = map(infinite, center) do o, i
     a = centered(identity, o, i)
-    CartesianArray(a, tuple(o))
+    CVector(a, tuple(o))
 end
 
 # geometry
 levelset = HyperSphere(0.25, 0.5 .* one.(eltype.(xyz)))
 
-v = CartesianArray{SVector{length(outer)+1,T}}(undef, outer)
+v = CVector{SVector{length(outer)+1,T}}(undef, outer)
 integrate!(v, Tuple{0}, levelset, xyz, outer)
 
-a = CartesianArray{T}(undef, (outer..., OneTo(length(outer))))
+a = CVector{T}(undef, (outer..., OneTo(length(outer))))
 integrate!(a, Tuple{1}, levelset, xyz, outers)
 
 #b = CartesianArray{T}(undef, (outer..., OneTo(length(outer))))
