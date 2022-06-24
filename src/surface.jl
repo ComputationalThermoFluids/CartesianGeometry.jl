@@ -6,23 +6,23 @@ end
 =#
 #function integrate!(mom, ::Type{Tuple{1}}, f, xyz, faces)
 #=
-function integrate!(mom, ::Type{Tuple{1}}, f, xyz, ranges)
+function integrate!(mom, ::Type{Tuple{1}}, f, xyz, domains)
     reshaped = reshape(mom)
     xyz = reshape.(xyz)
 
-    _integrate!(reshaped, Tuple{1}, f, xyz, ranges)
+    _integrate!(reshaped, Tuple{1}, f, xyz, domains)
 
     mom
 end
 =#
 
 function _integrate!(mom::ArrayAbstract{2}, ::Type{Tuple{1}},
-                     f, xyz, ranges)
+                     f, xyz, domains)
     (x,) = xyz
 
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices.(ranges)
+    indices = CartesianIndices.(domains)
 
     for index in indices[1]
         (i,) = Tuple(index)
@@ -33,12 +33,12 @@ function _integrate!(mom::ArrayAbstract{2}, ::Type{Tuple{1}},
 end
 
 function _integrate!(mom::ArrayAbstract{3}, ::Type{Tuple{1}},
-                     f, xyz, ranges)
+                     f, xyz, domains)
     (x, y) = xyz
 
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices.(ranges)
+    indices = CartesianIndices.(domains)
 
     for index in indices[1]
         (i, j) = Tuple(index)
@@ -54,12 +54,12 @@ function _integrate!(mom::ArrayAbstract{3}, ::Type{Tuple{1}},
 end
 
 function _integrate!(mom::ArrayAbstract{4}, ::Type{Tuple{1}},
-                     f, xyz, ranges)
+                     f, xyz, domains)
     (x, y, z) = xyz
 
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices.(ranges)
+    indices = CartesianIndices.(domains)
 
     for index in indices[1]
         (i, j, k) = Tuple(index)

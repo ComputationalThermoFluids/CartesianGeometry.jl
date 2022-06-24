@@ -2,8 +2,8 @@
 """
 
 - `xyz`: abscissas of staggered edges;
-- `stagger`, `center`: outer ranges;
-- `inner`: centered inner range.
+- `stagger`, `center`: outer domains;
+- `inner`: centered inner domain.
 
 """
 function integrate(::Type{Tuple{0,1}}, f, xyz, stagger, center, inner)
@@ -23,8 +23,8 @@ function integrate!(mom, f, xyz, stagger, center, inner)
         reshape(el, dims...)
     end
 
-    rxyz = map(xyz, stagger) do el, range
-        reshape(el, length(range))
+    rxyz = map(xyz, stagger) do el, domain
+        reshape(el, length(domain))
     end
 
     stagger = findin.(inner, stagger)
@@ -37,21 +37,21 @@ end
 
 =#
 
-function integrate!(mom, ::Type{Tuple{P}}, f, xyz, ranges) where {P}
+function integrate!(mom, ::Type{Tuple{P}}, f, xyz, domain) where {P}
     reshaped = reshape(mom)
     xyz = reshape.(xyz)
 
-    _integrate!(reshaped, Tuple{P}, f, xyz, ranges)
+    _integrate!(reshaped, Tuple{P}, f, xyz, domain)
 
     mom
 end
 
 @generated function _integrate!(mom::ArrayAbstract{N}, ::Type{Tuple{0}},
-                                f, xyz, ranges) where {N}
+                                f, xyz, domain) where {N}
     quote
         @ntuple($N, x) = xyz
 
-        indices = CartesianIndices(ranges)
+        indices = CartesianIndices(domain)
 
         xex = zeros(Cdouble, 4)
 

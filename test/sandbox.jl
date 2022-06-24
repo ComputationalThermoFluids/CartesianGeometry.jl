@@ -1,23 +1,27 @@
+using StaticArrays
+using Accessors
 using CartesianArrays
 using CartesianGeometry
-using StaticArrays
 
 import Base: OneTo
 
 const T = Float64
 
-# "universe" range for mesh abscissas
+# "universe" domain for mesh abscissas
 # to not think about it
 universe = (-1:11, -1:19)
 
-# primary ranges
+# primary domains
 outer = (0:10, 0:18)
 node = (1:9, 1:17)
 center = (1:8, 1:16)
 
-# secondary ranges
-faces = ntuple(length(outer)) do i
-    ntuple(j -> j==i ? node[i] : center[j], length(outer))
+# secondary domains
+#faces = ntuple(length(outer)) do i
+#    ntuple(j -> j==i ? node[i] : center[j], length(outer))
+#end
+faces = ntuple(length(outer)) do d
+    @set center[d] = node[d]
 end
 outers = ntuple(length(outer)) do _
     outer

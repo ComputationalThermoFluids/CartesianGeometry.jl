@@ -4,6 +4,7 @@ authors = ["Vincent Le Chenadec <vincentlechenadec@gmail.com> and contributors"]
 version = "0.1.0"
 
 [deps]
+Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 CartesianArrays = "76a5a9e6-eaa9-45ad-9e60-9c4e19c8bef4"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 TiledIteration = "06e1c1a7-607b-532d-9fad-de7d9aa2abac"
