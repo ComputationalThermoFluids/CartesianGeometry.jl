@@ -73,7 +73,7 @@ function _integrate!(mom::ArrayAbstract{4}, ::Type{Tuple{1}},
                                             SVector(z[k], z[k+1]))
     end
 
-    for ind in indices[3]
+    for index in indices[3]
         (i, j, k) = Tuple(index)
         mom[i, j, k, 3] = _getarea!(xex, f, SVector(x[i], x[i+1]),
                                             SVector(y[j], y[j+1]), z[k])

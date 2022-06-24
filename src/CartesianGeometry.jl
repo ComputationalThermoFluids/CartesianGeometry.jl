@@ -11,7 +11,7 @@ import Base: getindex
 
 export HyperSphere
 #export mesh
-export staggered, centered
+export collocated, staggered
 export Dirichlet, apply!
 export integrate!#integrate
 export getvolume

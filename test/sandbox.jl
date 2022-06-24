@@ -6,9 +6,9 @@ import Base: OneTo
 
 const T = Float64
 
-# "infinite" range for mesh abscissas
+# "universe" range for mesh abscissas
 # to not think about it
-infinite = (-1:11, -1:19)
+universe = (-1:11, -1:19)
 
 # primary ranges
 outer = (0:10, 0:18)
@@ -23,15 +23,8 @@ outers = ntuple(length(outer)) do _
     outer
 end
 
-xyz = map(infinite, node) do o, i
-    a = staggered(identity, o, i)
-    CVector(a, tuple(o))
-end
-
-xyz_ = map(infinite, center) do o, i
-    a = centered(identity, o, i)
-    CVector(a, tuple(o))
-end
+xyz = collocated.(Ref(identity), universe, node)
+#xyz_ = staggered.(Ref(identity), universe, center)
 
 # geometry
 levelset = HyperSphere(0.25, 0.5 .* one.(eltype.(xyz)))
@@ -46,7 +39,7 @@ integrate!(a, Tuple{1}, levelset, xyz, outers)
 #integrate!(b, Tuple{1}, levelset, xyz, v, outer)
 
 #= from here
-(v, coor) = integrate(Tuple{0,1}, levelset, sxyz, infinite, couter, cinner)
+(v, coor) = integrate(Tuple{0,1}, levelset, sxyz, universe, couter, cinner)
 to there =#
 
 #    mesh.(Ref(Val{true}), Ref(identity), ranges, stagger)
