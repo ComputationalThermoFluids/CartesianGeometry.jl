@@ -21,7 +21,6 @@ end
 function vofinit!(xex, f, x::SVector; nex=Cint.((1, 0)))
     t = SVector{2}(f(i) for i in x)
 
-    @show "coucou"
     val = x[2] - x[1]
 
     if all(isnonpositive, t)
