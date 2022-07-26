@@ -3,6 +3,7 @@ module CartesianGeometry
 using Base.Cartesian
 using StaticArrays
 using Vofinit
+using CartesianCore
 using CartesianArrays
 
 export HyperSphere

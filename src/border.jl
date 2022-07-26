@@ -19,7 +19,7 @@ function apply!(v, border::Dirichlet)
         reshape(x, length(r))
     end
 
-    inner = CartesianGeometry.findin.(inner, outer)
+    inner = findin.(inner, outer)
     outer = eachindex.(outer)
 
     _apply!(rv, f, rxyz, outer, inner)
