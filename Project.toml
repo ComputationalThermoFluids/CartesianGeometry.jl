@@ -10,6 +10,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Vofinit = "1beee101-8e09-4165-b3f9-a3e33534e38b"
 
 [compat]
+StaticArrays = "1"
 julia = "1"
 
 [extras]
