@@ -1,103 +1,108 @@
-function integrate!(mom, ::Type{Tuple{P}}, f, xyz, domain) where {P}
-    reshaped = reshape(mom)
-    xyz = reshape.(xyz)
+"""
 
-    _integrate!(reshaped, Tuple{P}, f, xyz, domain)
+    integrate(Tuple{0}, f, absc, dom)
 
-    mom
+Computes volume-specific (`Tuple{0}`) apertures of the first kind.
+
+"""
+function integrate(::Type{Tuple{0}}, f, absc, dom)
+    T = SVector{length(absc)+1,Float64}
+    mom = Vector{T}(undef, length(dom))
+    integrate!(mom, Tuple{0}, f, absc, dom)
 end
 
-@generated function _integrate!(mom::ArrayAbstract{N}, ::Type{Tuple{0}},
-                                f, xyz, domain) where {N}
+@generated function integrate!(mom, ::Type{Tuple{0}},
+                               f, absc::NTuple{N}, dom) where {N}
     quote
-        @ntuple($N, x) = xyz
-
-        indices = CartesianIndices(domain)
+        @ntuple($N, x) = absc
 
         xex = zeros(Cdouble, 4)
 
-        for index in indices
+        for (i, index) in enumerate(dom)
             @ntuple($N, i) = Tuple(index)
 
             @nextract($N, y, d -> SVector(x_d[i_d], x_d[i_d+1]))
 
             vol = @ncall($N, vofinit!, xex, f, y)
-            @nref($N, mom, i) = @ncall($N, SVector, vol, d -> xex[d])
+            mom[i] = @ncall($N, SVector, vol, d -> xex[d])
         end
 
         mom
     end
 end
 
-function _integrate!(a::ArrayAbstract{2}, ::Type{Tuple{1}},
-                     f, xyz, domains)
-    (x,) = xyz
+"""
 
-    nex = Cint.((0, 0))
+    integrate(Tuple{1}, f, absc, dom)
+
+Computes area-specific (`Tuple{1}`) apertures of the first kind.
+
+"""
+function integrate(::Type{Tuple{1}}, f, absc, doms)
+    moms = map(doms) do dom
+        Vector{Float64}(undef, length(dom))
+    end
+    integrate!(moms, Tuple{1}, f, absc, doms)
+end
+
+function integrate!(moms, ::Type{Tuple{1}}, f, absc::NTuple{1}, doms)
+    (x,) = absc
+
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices(domains[1])
-
-    for index in indices
+    for (n, index) in enumerate(doms[1])
         (i,) = Tuple(index)
-        a[i, 1] = vofinit!(xex, f, x[i])
+        moms[1][n] = vofinit!(xex, f, x[i])
     end
 
-    a
+    moms
 end
 
-function _integrate!(a::ArrayAbstract{3}, ::Type{Tuple{1}},
-                     f, xyz, domains)
-    (x, y) = xyz
+function integrate!(moms, ::Type{Tuple{1}}, f, absc::NTuple{2}, doms)
+    (x, y) = absc
 
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices(domains[1])
-
-    for index in indices
+    for (n, index) in enumerate(doms[1])
         (i, j) = Tuple(index)
-        a[i, j, 1] = vofinit!(xex, f, x[i], SVector(y[j], y[j+1]))
+        moms[1][n] = vofinit!(xex, f, x[i],
+                                      SVector(y[j], y[j+1]))
     end
 
-    indices = CartesianIndices(domains[2])
-
-    for index in indices
+    for (n, index) in enumerate(doms[2])
         (i, j) = Tuple(index)
-        a[i, j, 2] = vofinit!(xex, f, SVector(x[i], x[i+1]), y[j])
+        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      y[j])
     end
 
-    a
+    moms
 end
 
-function _integrate!(a::ArrayAbstract{4}, ::Type{Tuple{1}},
-                     f, xyz, domains)
-    (x, y, z) = xyz
+function integrate!(moms, ::Type{Tuple{1}}, f, absc::NTuple{3}, doms)
+    (x, y, z) = absc
 
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices(domains[1])
-
-    for index in indices
+    for (n, index) in enumerate(doms[1])
         (i, j, k) = Tuple(index)
-        a[i, j, k, 1] = vofinit!(xex, f, x[i], SVector(y[j], y[j+1]),
-                                               SVector(z[k], z[k+1]))
+        moms[1][n] = vofinit!(xex, f, x[i],
+                                      SVector(y[j], y[j+1]),
+                                      SVector(z[k], z[k+1]))
     end
 
-    indices = CartesianIndices(domains[2])
-
-    for index in indices
+    for (n, index) in enumerate(doms[2])
         (i, j, k) = Tuple(index)
-        a[i, j, k, 2] = vofinit!(xex, f, SVector(x[i], x[i+1]), y[j],
-                                         SVector(z[k], z[k+1]))
+        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      y[j],
+                                      SVector(z[k], z[k+1]))
     end
 
-    indices = CartesianIndices(domains[3])
-
-    for index in indices
+    for (n, index) in enumerate(doms[3])
         (i, j, k) = Tuple(index)
-        a[i, j, k, 3] = vofinit!(xex, f, SVector(x[i], x[i+1]),
-                                         SVector(y[j], y[j+1]), z[k])
+        moms[3][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      SVector(y[j], y[j+1]),
+                                      z[k])
     end
 
-    a
+    moms
 end

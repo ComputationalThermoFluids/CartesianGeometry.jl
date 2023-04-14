@@ -12,10 +12,11 @@ function collocated(f, outer, inner)
     up = findfirst(isequal(last(inner)), outer)
 
     for i in eachindex(outer)
-        x[i] = f((i-lo) / (up-lo))
+        x[i] = f((i-lo) / (up-lo+1))
     end
 
-    CVector(x, tuple(outer))
+    x
+#    CVector(x, tuple(outer))
 end
 
 """
@@ -35,5 +36,6 @@ function staggered(f, outer, inner)
         x[i] = f((2(i-lo) + 1) / 2(up-lo+1))
     end
 
-    CVector(x, tuple(outer))
+    x
+#    CVector(x, tuple(outer))
 end
