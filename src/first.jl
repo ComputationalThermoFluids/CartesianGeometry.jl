@@ -1,9 +1,36 @@
-droplast(this::Base.OneTo, n=1) = Base.OneTo(length(this)-n)
-droplast(this::AbstractRange, n=1) = this[begin:end-n]
+#=
+
+          ?           ?           ?           ?           ?
+
+
+y_4 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+    |  V_{1,3}  |  V_{2,3}  |  V_{3,3}  |  V_{4,3}  |     ?
+    |           |           |           |           |
+    |           |           |           |           |
+y_3 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+    |  V_{1,2}  |  V_{2,2}  |  V_{3,2}  |  V_{4,2}  |     ?
+    |           |           |           |           |
+    |           |           |           |           |
+y_2 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+    |  V_{1,1}  |  V_{2,1}  |  V_{3,1}  |  V_{4,1}  |     ?
+    |           |           |           |           |
+    |           |           |           |           |
+y_1 +-----------+-----------+-----------+-----------+
+   x_1         x_2         x_3         x_4         x_5
+
+              (and same for barycenters...)
+
+=#
 
 """
 
-    integrate(Tuple{0}, f, xyz, T=Float64)
+    integrate(Tuple{0}, f, xyz, T, bc)
 
 Computes volume-specific (`Tuple{0}`) apertures of the first kind.
 
@@ -12,25 +39,32 @@ Returns a `Tuple` where
 1. The first component is a `Vector{T}` that stores the wet volumes of each cell,
 1. The second component is a `Vector{SVector{N,T}}` that stores the coordinates of the wet barycenters.
 
-Wherever the moments can not be computed, the values are set to zero.
+Wherever the moments can not be computed, the function `bc` is applied to the element type.
 
 # Arguments
 
 - `f`: the level set function.
 - `xyz`: the Cartesian coordinates of the lattice nodes.
+- `T`: the `eltype` of the moments.
+- `bc`: the boundary condition (*e.g.* `nan` or `zero`).
+
+!!! note
+
+    To simplify the computation of second-kind moments, barycenters of `-f` are stored in empty cells.
 
 """
-function integrate(::Type{Tuple{0}}, f, xyz, T=Float64)
+function integrate(::Type{Tuple{0}}, f, xyz, T, bc)
     N, len = length(xyz), prod(length.(xyz))
 
     v = Vector{T}(undef, len)
     bary = Vector{SVector{N,T}}(undef, len)
 
-    integrate!((v, bary), Tuple{0}, f, xyz)
+    integrate!((v, bary), Tuple{0}, f, xyz, bc)
 end
 
+# ND volume
 @generated function integrate!(moms, ::Type{Tuple{0}},
-                               f, xyz::NTuple{N}) where {N}
+                               f, xyz::NTuple{N}, bc) where {N}
     quote
         # axes
         input = only.(axes.(xyz))
@@ -62,17 +96,70 @@ end
         for index in halo
             n = linear[index]
 
-            v[n] = zero(eltype(v))
-            bary[n] = zero(eltype(bary))
+            v[n] = bc(eltype(v))
+            bary[n] = bc(eltype(bary))
         end
 
         return moms
     end
 end
 
+#=
+
+    ?           ?           ?           ?           ?
+
+
+y_4 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+ A_{1,3}     A_{2,3}     A_{3,3}     A_{4,3}     A_{5,3}
+    |           |           |           |           |
+    |           |           |           |           |
+y_3 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+ A_{1,2}     A_{2,2}     A_{3,2}     A_{4,2}     A_{5,2}
+    |           |           |           |           |
+    |           |           |           |           |
+y_2 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+ A_{1,1}     A_{2,1}     A_{3,1}     A_{4,1}     A_{5,1}
+    |           |           |           |           |
+    |           |           |           |           |
+y_1 +-----------+-----------+-----------+-----------+
+   x_1         x_2         x_3         x_4         x_5
+
+=#
+#=
+
+y_4 +--A_{1,4}--+--A_{2,4}--+--A_{3,4}--+--A_{4,4}--+     ?
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+y_3 +--A_{1,3}--+--A_{2,3}--+--A_{3,3}--+--A_{4,3}--+     ?
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+y_2 +--A_{1,2}--+--A_{2,2}--+--A_{3,2}--+--A_{4,2}--+     ?
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+y_1 +--A_{1,1}--+--A_{2,1}--+--A_{3,1}--+--A_{4,1}--+     ?
+   x_1         x_2         x_3         x_4         x_5
+
+
+=#
+
 """
 
-    integrate(Tuple{1}, f, xyz, T=Float64)
+    integrate(Tuple{1}, f, xyz, T, bc)
 
 Computes area-specific (`Tuple{1}`) apertures of the first kind.
 
@@ -82,62 +169,56 @@ Returns a `NTuple` where each element corresponds to  direction.
 
 - `f`: the level set function.
 - `xyz`: the Cartesian coordinates of the lattice nodes.
+- `T`: the `eltype` of the moments.
+- `bc`: the boundary condition (*e.g.* `nan` or `zero`).
 
 """
-function integrate(::Type{Tuple{1}}, f, xyz, T=Float64)
+function integrate(::Type{Tuple{1}}, f, xyz, T, bc)
     len = prod(length.(xyz))
 
     moms = map(xyz) do _
         Vector{T}(undef, len)
     end
 
-    integrate!(moms, Tuple{1}, f, xyz)
+    integrate!(moms, Tuple{1}, f, xyz, bc)
 end
 
-# 1D version
-function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{1})
-    # axes
-    input = only.(axes.(xyz))
+# 1D surface
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{1}, _)
 
-    # indices
+    input = only.(axes.(xyz))
     linear = LinearIndices(input)
 
     x, = xyz
-
     xex = zeros(Cdouble, 4)
 
     # x faces
-    output = input
-    cartesian = CartesianIndices(output)
 
-    for index in cartesian
-        n = linear[index]
-        (i,) = Tuple(index)
-        moms[1][n] = vofinit!(xex, f, x[i])
+    for n in linear
+        moms[1][n] = vofinit!(xex, f, x[n])
     end
 
     return moms
 end
 
-# 2D version
-function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2})
-    # axes
-    input = only.(axes.(xyz))
+# 2D surface
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2}, bc)
 
-    # indices
+    input = only.(axes.(xyz))
     linear = LinearIndices(input)
 
     x, y = xyz
-
     xex = zeros(Cdouble, 4)
 
     # x faces
+
     output = input[1], droplast(input[2])
     cartesian = CartesianIndices(output)
 
     for index in cartesian
         n = linear[index]
-        (i, j) = Tuple(index)
+        i, j = Tuple(index)
+
         moms[1][n] = vofinit!(xex, f, x[i],
                                       SVector(y[j], y[j+1]))
     end
@@ -147,16 +228,18 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2})
     for index in halo
         n = linear[index]
 
-        moms[1][n] = zero(eltype(moms[1]))
+        moms[1][n] = bc(eltype(moms[1]))
     end
 
     # y faces
+
     output = droplast(input[1]), input[2]
     cartesian = CartesianIndices(output)
 
     for index in cartesian
         n = linear[index]
-        (i, j) = Tuple(index)
+        i, j = Tuple(index)
+
         moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
                                       y[j])
     end
@@ -166,31 +249,30 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2})
     for index in halo
         n = linear[index]
 
-        moms[2][n] = zero(eltype(moms[2]))
+        moms[2][n] = bc(eltype(moms[2]))
     end
 
     return moms
 end
 
-# 3D version
-function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3})
-    # axes
-    input = only.(axes.(xyz))
+# 3D surface
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3}, bc)
 
-    # indices
+    input = only.(axes.(xyz))
     linear = LinearIndices(input)
 
     x, y, z = xyz
-
     xex = zeros(Cdouble, 4)
 
     # x faces
+
     output = input[1], droplast(input[2]), droplast(input[3])
     cartesian = CartesianIndices(output)
 
     for index in cartesian
         n = linear[index]
-        (i, j, k) = Tuple(index)
+        i, j, k = Tuple(index)
+
         moms[1][n] = vofinit!(xex, f, x[i],
                                       SVector(y[j], y[j+1]),
                                       SVector(z[k], z[k+1]))
@@ -201,16 +283,18 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3})
     for index in halo
         n = linear[index]
 
-        moms[1][n] = zero(eltype(moms[1]))
+        moms[1][n] = bc(eltype(moms[1]))
     end
 
     # y faces
+
     output = droplast(input[1]), input[2], droplast(input[3])
     cartesian = CartesianIndices(output)
 
     for index in cartesian
         n = linear[index]
-        (i, j, k) = Tuple(index)
+        i, j, k = Tuple(index)
+
         moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
                                       y[j],
                                       SVector(z[k], z[k+1]))
@@ -221,16 +305,18 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3})
     for index in halo
         n = linear[index]
 
-        moms[2][n] = zero(eltype(moms[2]))
+        moms[2][n] = bc(eltype(moms[2]))
     end
 
     # z faces
+
     output = droplast(input[1]), droplast(input[2]), input[3]
     cartesian = CartesianIndices(output)
 
     for index in cartesian
         n = linear[index]
-        (i, j, k) = Tuple(index)
+        i, j, k = Tuple(index)
+
         moms[3][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
                                       SVector(y[j], y[j+1]),
                                       z[k])
@@ -241,7 +327,7 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3})
     for index in halo
         n = linear[index]
 
-        moms[3][n] = zero(eltype(moms[3]))
+        moms[3][n] = bc(eltype(moms[3]))
     end
 
     return moms

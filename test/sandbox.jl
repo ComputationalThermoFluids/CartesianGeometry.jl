@@ -11,7 +11,7 @@ node = (1:9, 1:17)
 #center = (1:8, 1:16)
 
 # define mesh
-xyz = collocated.(Ref(identity), universe, node)
+xyz = collocated.(identity, universe, node)
 
 @assert all(@. isequal(length(xyz), length(universe)))
 
@@ -21,8 +21,8 @@ const a, b = 0.5, 0.5
 
 levelset = HyperSphere(R, (a, b))
 
-# first-kind moments
-vol, bary = integrate(Tuple{0}, levelset, xyz, T)
+#=
+vol, bary = integrate(Tuple{0}, levelset, xyz, T, zero)
 
 @assert isequal(length(vol), prod(length.(universe)))
 @assert isequal(length(bary), prod(length.(universe)))
@@ -31,9 +31,19 @@ vol, bary = integrate(Tuple{0}, levelset, xyz, T)
 @assert isapprox(sum(first.(bary) .* vol), π * R ^ 2 * a)
 @assert isapprox(sum(last.(bary) .* vol), π * R ^ 2 * b)
 
-surf = integrate(Tuple{1}, levelset, xyz, T)
+surf = integrate(Tuple{1}, levelset, xyz, T, zero)
 
 @assert all(isequal.(length.(surf), prod(length.(universe))))
+=#
+
+V, bary = integrate(Tuple{0}, levelset, xyz, T, nan)
+As = integrate(Tuple{1}, levelset, xyz, T, nan)
+
+Ws = integrate(Tuple{0}, levelset, xyz, T, nan, bary)
+Bs = integrate(Tuple{1}, levelset, xyz, T, nan, bary)
+
+# second-kind moments
+#tmp = integrate(Tuple{0}, levelset, xyz, bary)
 
 #=
 using StaticArrays

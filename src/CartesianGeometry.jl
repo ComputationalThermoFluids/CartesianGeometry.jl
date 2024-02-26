@@ -7,6 +7,7 @@ using Vofinit
 #using CartesianCore
 #using CartesianArrays
 
+export nan
 export HyperSphere
 export collocated, staggered
 export integrate, integrate!
@@ -16,7 +17,6 @@ include("zoo.jl")
 include("mesh.jl")
 include("vofinit.jl")
 include("first.jl")
-#include("second.jl")
-include("_second.jl")
+include("second.jl")
 
 end
