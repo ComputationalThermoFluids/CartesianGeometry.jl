@@ -3,33 +3,37 @@ droplast(this::AbstractRange, n=1) = this[begin:end-n]
 
 """
 
-    integrate(Tuple{0}, f, absc, dom)
+    integrate(Tuple{0}, f, xyz, T=Float64)
 
 Computes volume-specific (`Tuple{0}`) apertures of the first kind.
 
-Returns a `Tuple` which stores
+Returns a `Tuple` where
 
-1. The axes over which the apertures were computed.
-1. The `Vector` that stores the apertures (length consistent with `absc`).
+1. The first component is a `Vector{T}` that stores the wet volumes of each cell,
+1. The second component is a `Vector{SVector{N,T}}` that stores the coordinates of the wet barycenters.
+
+Wherever the moments can not be computed, the values are set to zero.
 
 # Arguments
 
 - `f`: the level set function.
-- `absc`: the abscissas of the lattice nodes.
+- `xyz`: the Cartesian coordinates of the lattice nodes.
 
 """
-function integrate(::Type{Tuple{0}}, f, absc, T=Float64)
-    N, n = length(absc), prod(length.(absc))
-    v = Vector{T}(undef, n)
-    bary = Vector{SVector{N,T}}(undef, n)
-    integrate!((v, bary), Tuple{0}, f, absc)
+function integrate(::Type{Tuple{0}}, f, xyz, T=Float64)
+    N, len = length(xyz), prod(length.(xyz))
+
+    v = Vector{T}(undef, len)
+    bary = Vector{SVector{N,T}}(undef, len)
+
+    integrate!((v, bary), Tuple{0}, f, xyz)
 end
 
 @generated function integrate!(moms, ::Type{Tuple{0}},
-                               f, absc::NTuple{N}) where {N}
+                               f, xyz::NTuple{N}) where {N}
     quote
         # axes
-        input = only.(axes.(absc))
+        input = only.(axes.(xyz))
         output = droplast.(input)
 
         # indices
@@ -37,7 +41,7 @@ end
         cartesian = CartesianIndices(output)
 
         (v, bary) = moms
-        @ntuple($N, x) = absc
+        @ntuple($N, x) = xyz
 
         xex = zeros(Cdouble, 4)
 
@@ -52,32 +56,53 @@ end
             bary[n] = @ncall($N, SVector, d -> xex[d])
         end
 
-        return output, moms...
+        # boundary conditions
+        halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+        for index in halo
+            n = linear[index]
+
+            v[n] = zero(eltype(v))
+            bary[n] = zero(eltype(bary))
+        end
+
+        return moms
     end
 end
 
 """
 
-    integrate(Tuple{1}, f, absc, dom)
+    integrate(Tuple{1}, f, xyz, T=Float64)
 
 Computes area-specific (`Tuple{1}`) apertures of the first kind.
 
+Returns a `NTuple` where each element corresponds to  direction.
+
+# Arguments
+
+- `f`: the level set function.
+- `xyz`: the Cartesian coordinates of the lattice nodes.
+
 """
-function integrate(::Type{Tuple{1}}, f, absc, T=Float64)
-    avs = map(absc) do _
-        Vector{T}(undef, prod(length.(absc)))
+function integrate(::Type{Tuple{1}}, f, xyz, T=Float64)
+    len = prod(length.(xyz))
+
+    moms = map(xyz) do _
+        Vector{T}(undef, len)
     end
-    integrate!(avs, Tuple{1}, f, absc)
+
+    integrate!(moms, Tuple{1}, f, xyz)
 end
 
-function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{1})
+# 1D version
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{1})
     # axes
-    input = only.(axes.(absc))
+    input = only.(axes.(xyz))
 
     # indices
     linear = LinearIndices(input)
 
-    (x,) = absc
+    x, = xyz
 
     xex = zeros(Cdouble, 4)
 
@@ -88,22 +113,21 @@ function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{1})
     for index in cartesian
         n = linear[index]
         (i,) = Tuple(index)
-        avs[1][n] = vofinit!(xex, f, x[i])
+        moms[1][n] = vofinit!(xex, f, x[i])
     end
 
-    axs = (output,)
-
-    return axs, avs
+    return moms
 end
 
-function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{2})
+# 2D version
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2})
     # axes
-    input = only.(axes.(absc))
+    input = only.(axes.(xyz))
 
     # indices
     linear = LinearIndices(input)
 
-    (x, y) = absc
+    x, y = xyz
 
     xex = zeros(Cdouble, 4)
 
@@ -114,11 +138,17 @@ function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{2})
     for index in cartesian
         n = linear[index]
         (i, j) = Tuple(index)
-        avs[1][n] = vofinit!(xex, f, x[i],
-                                     SVector(y[j], y[j+1]))
+        moms[1][n] = vofinit!(xex, f, x[i],
+                                      SVector(y[j], y[j+1]))
     end
 
-    axs = (output,)
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+    for index in halo
+        n = linear[index]
+
+        moms[1][n] = zero(eltype(moms[1]))
+    end
 
     # y faces
     output = droplast(input[1]), input[2]
@@ -127,23 +157,30 @@ function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{2})
     for index in cartesian
         n = linear[index]
         (i, j) = Tuple(index)
-        avs[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
-                                     y[j])
+        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      y[j])
     end
 
-    axs = (axs..., output)
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
 
-    return axs, avs
+    for index in halo
+        n = linear[index]
+
+        moms[2][n] = zero(eltype(moms[2]))
+    end
+
+    return moms
 end
 
-function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{3})
+# 3D version
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3})
     # axes
-    input = only.(axes.(absc))
+    input = only.(axes.(xyz))
 
     # indices
     linear = LinearIndices(input)
 
-    (x, y, z) = absc
+    x, y, z = xyz
 
     xex = zeros(Cdouble, 4)
 
@@ -154,12 +191,18 @@ function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{3})
     for index in cartesian
         n = linear[index]
         (i, j, k) = Tuple(index)
-        avs[1][n] = vofinit!(xex, f, x[i],
-                                     SVector(y[j], y[j+1]),
-                                     SVector(z[k], z[k+1]))
+        moms[1][n] = vofinit!(xex, f, x[i],
+                                      SVector(y[j], y[j+1]),
+                                      SVector(z[k], z[k+1]))
     end
 
-    axs = (output,)
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+    for index in halo
+        n = linear[index]
+
+        moms[1][n] = zero(eltype(moms[1]))
+    end
 
     # y faces
     output = droplast(input[1]), input[2], droplast(input[3])
@@ -168,12 +211,18 @@ function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{3})
     for index in cartesian
         n = linear[index]
         (i, j, k) = Tuple(index)
-        avs[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
-                                     y[j],
-                                     SVector(z[k], z[k+1]))
+        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      y[j],
+                                      SVector(z[k], z[k+1]))
     end
 
-    axs = (axs..., output)
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+    for index in halo
+        n = linear[index]
+
+        moms[2][n] = zero(eltype(moms[2]))
+    end
 
     # z faces
     output = droplast(input[1]), droplast(input[2]), input[3]
@@ -182,12 +231,18 @@ function integrate!(avs, ::Type{Tuple{1}}, f, absc::NTuple{3})
     for index in cartesian
         n = linear[index]
         (i, j, k) = Tuple(index)
-        avs[3][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
-                                     SVector(y[j], y[j+1]),
-                                     z[k])
+        moms[3][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      SVector(y[j], y[j+1]),
+                                      z[k])
     end
 
-    axs = (axs..., output)
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
 
-    return axs, avs
+    for index in halo
+        n = linear[index]
+
+        moms[3][n] = zero(eltype(moms[3]))
+    end
+
+    return moms
 end
