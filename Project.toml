@@ -10,6 +10,7 @@ Vofinit = "1beee101-8e09-4165-b3f9-a3e33534e38b"
 
 [compat]
 StaticArrays = "1"
+TiledIteration = "0.5"
 Vofinit = "0.1"
 julia = "1"
 
