@@ -1,103 +1,334 @@
-function integrate!(mom, ::Type{Tuple{P}}, f, xyz, domain) where {P}
-    reshaped = reshape(mom)
-    xyz = reshape.(xyz)
+#=
 
-    _integrate!(reshaped, Tuple{P}, f, xyz, domain)
+          ?           ?           ?           ?           ?
 
-    mom
+
+y_4 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+    |  V_{1,3}  |  V_{2,3}  |  V_{3,3}  |  V_{4,3}  |     ?
+    |           |           |           |           |
+    |           |           |           |           |
+y_3 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+    |  V_{1,2}  |  V_{2,2}  |  V_{3,2}  |  V_{4,2}  |     ?
+    |           |           |           |           |
+    |           |           |           |           |
+y_2 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+    |  V_{1,1}  |  V_{2,1}  |  V_{3,1}  |  V_{4,1}  |     ?
+    |           |           |           |           |
+    |           |           |           |           |
+y_1 +-----------+-----------+-----------+-----------+
+   x_1         x_2         x_3         x_4         x_5
+
+              (and same for barycenters...)
+
+=#
+
+"""
+
+    integrate(Tuple{0}, f, xyz, T, bc)
+
+Computes volume-specific (`Tuple{0}`) apertures of the first kind.
+
+Returns a `Tuple` where
+
+1. The first component is a `Vector{T}` that stores the wet volumes of each cell,
+1. The second component is a `Vector{SVector{N,T}}` that stores the coordinates of the wet barycenters.
+
+Wherever the moments can not be computed, the function `bc` is applied to the element type.
+
+# Arguments
+
+- `f`: the level set function.
+- `xyz`: the Cartesian coordinates of the lattice nodes.
+- `T`: the `eltype` of the moments.
+- `bc`: the boundary condition (*e.g.* `nan` or `zero`).
+
+!!! note
+
+    To simplify the computation of second-kind moments, barycenters of `-f` are stored in empty cells.
+
+"""
+function integrate(::Type{Tuple{0}}, f, xyz, T, bc)
+    N, len = length(xyz), prod(length.(xyz))
+
+    v = Vector{T}(undef, len)
+    bary = Vector{SVector{N,T}}(undef, len)
+
+    integrate!((v, bary), Tuple{0}, f, xyz, bc)
 end
 
-@generated function _integrate!(mom::ArrayAbstract{N}, ::Type{Tuple{0}},
-                                f, xyz, domain) where {N}
+# ND volume
+@generated function integrate!(moms, ::Type{Tuple{0}},
+                               f, xyz::NTuple{N}, bc) where {N}
     quote
-        @ntuple($N, x) = xyz
+        # axes
+        input = only.(axes.(xyz))
+        output = droplast.(input)
 
-        indices = CartesianIndices(domain)
+        # indices
+        linear = LinearIndices(input)
+        cartesian = CartesianIndices(output)
+
+        (v, bary) = moms
+        @ntuple($N, x) = xyz
 
         xex = zeros(Cdouble, 4)
 
-        for index in indices
+        for index in cartesian
+            n = linear[index]
+
             @ntuple($N, i) = Tuple(index)
 
             @nextract($N, y, d -> SVector(x_d[i_d], x_d[i_d+1]))
 
-            vol = @ncall($N, vofinit!, xex, f, y)
-            @nref($N, mom, i) = @ncall($N, SVector, vol, d -> xex[d])
+            v[n] = @ncall($N, vofinit!, xex, f, y)
+            bary[n] = @ncall($N, SVector, d -> xex[d])
         end
 
-        mom
+        # boundary conditions
+        halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+        for index in halo
+            n = linear[index]
+
+            v[n] = bc(eltype(v))
+            bary[n] = bc(eltype(bary))
+        end
+
+        return moms
     end
 end
 
-function _integrate!(a::ArrayAbstract{2}, ::Type{Tuple{1}},
-                     f, xyz, domains)
-    (x,) = xyz
+#=
 
-    nex = Cint.((0, 0))
-    xex = zeros(Cdouble, 4)
+    ?           ?           ?           ?           ?
 
-    indices = CartesianIndices(domains[1])
 
-    for index in indices
-        (i,) = Tuple(index)
-        a[i, 1] = vofinit!(xex, f, x[i])
+y_4 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+ A_{1,3}     A_{2,3}     A_{3,3}     A_{4,3}     A_{5,3}
+    |           |           |           |           |
+    |           |           |           |           |
+y_3 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+ A_{1,2}     A_{2,2}     A_{3,2}     A_{4,2}     A_{5,2}
+    |           |           |           |           |
+    |           |           |           |           |
+y_2 +-----------+-----------+-----------+-----------+
+    |           |           |           |           |
+    |           |           |           |           |
+ A_{1,1}     A_{2,1}     A_{3,1}     A_{4,1}     A_{5,1}
+    |           |           |           |           |
+    |           |           |           |           |
+y_1 +-----------+-----------+-----------+-----------+
+   x_1         x_2         x_3         x_4         x_5
+
+=#
+#=
+
+y_4 +--A_{1,4}--+--A_{2,4}--+--A_{3,4}--+--A_{4,4}--+     ?
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+y_3 +--A_{1,3}--+--A_{2,3}--+--A_{3,3}--+--A_{4,3}--+     ?
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+y_2 +--A_{1,2}--+--A_{2,2}--+--A_{3,2}--+--A_{4,2}--+     ?
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+    |           |           |           |           |
+y_1 +--A_{1,1}--+--A_{2,1}--+--A_{3,1}--+--A_{4,1}--+     ?
+   x_1         x_2         x_3         x_4         x_5
+
+
+=#
+
+"""
+
+    integrate(Tuple{1}, f, xyz, T, bc)
+
+Computes area-specific (`Tuple{1}`) apertures of the first kind.
+
+Returns a `NTuple` where each element corresponds to  direction.
+
+# Arguments
+
+- `f`: the level set function.
+- `xyz`: the Cartesian coordinates of the lattice nodes.
+- `T`: the `eltype` of the moments.
+- `bc`: the boundary condition (*e.g.* `nan` or `zero`).
+
+"""
+function integrate(::Type{Tuple{1}}, f, xyz, T, bc)
+    len = prod(length.(xyz))
+
+    moms = map(xyz) do _
+        Vector{T}(undef, len)
     end
 
-    a
+    integrate!(moms, Tuple{1}, f, xyz, bc)
 end
 
-function _integrate!(a::ArrayAbstract{3}, ::Type{Tuple{1}},
-                     f, xyz, domains)
-    (x, y) = xyz
+# 1D surface
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{1}, _)
 
+    input = only.(axes.(xyz))
+    linear = LinearIndices(input)
+
+    x, = xyz
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices(domains[1])
+    # x faces
 
-    for index in indices
-        (i, j) = Tuple(index)
-        a[i, j, 1] = vofinit!(xex, f, x[i], SVector(y[j], y[j+1]))
+    for n in linear
+        moms[1][n] = vofinit!(xex, f, x[n])
     end
 
-    indices = CartesianIndices(domains[2])
-
-    for index in indices
-        (i, j) = Tuple(index)
-        a[i, j, 2] = vofinit!(xex, f, SVector(x[i], x[i+1]), y[j])
-    end
-
-    a
+    return moms
 end
 
-function _integrate!(a::ArrayAbstract{4}, ::Type{Tuple{1}},
-                     f, xyz, domains)
-    (x, y, z) = xyz
+# 2D surface
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2}, bc)
 
+    input = only.(axes.(xyz))
+    linear = LinearIndices(input)
+
+    x, y = xyz
     xex = zeros(Cdouble, 4)
 
-    indices = CartesianIndices(domains[1])
+    # x faces
 
-    for index in indices
-        (i, j, k) = Tuple(index)
-        a[i, j, k, 1] = vofinit!(xex, f, x[i], SVector(y[j], y[j+1]),
-                                               SVector(z[k], z[k+1]))
+    output = input[1], droplast(input[2])
+    cartesian = CartesianIndices(output)
+
+    for index in cartesian
+        n = linear[index]
+        i, j = Tuple(index)
+
+        moms[1][n] = vofinit!(xex, f, x[i],
+                                      SVector(y[j], y[j+1]))
     end
 
-    indices = CartesianIndices(domains[2])
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
 
-    for index in indices
-        (i, j, k) = Tuple(index)
-        a[i, j, k, 2] = vofinit!(xex, f, SVector(x[i], x[i+1]), y[j],
-                                         SVector(z[k], z[k+1]))
+    for index in halo
+        n = linear[index]
+
+        moms[1][n] = bc(eltype(moms[1]))
     end
 
-    indices = CartesianIndices(domains[3])
+    # y faces
 
-    for index in indices
-        (i, j, k) = Tuple(index)
-        a[i, j, k, 3] = vofinit!(xex, f, SVector(x[i], x[i+1]),
-                                         SVector(y[j], y[j+1]), z[k])
+    output = droplast(input[1]), input[2]
+    cartesian = CartesianIndices(output)
+
+    for index in cartesian
+        n = linear[index]
+        i, j = Tuple(index)
+
+        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      y[j])
     end
 
-    a
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+    for index in halo
+        n = linear[index]
+
+        moms[2][n] = bc(eltype(moms[2]))
+    end
+
+    return moms
+end
+
+# 3D surface
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3}, bc)
+
+    input = only.(axes.(xyz))
+    linear = LinearIndices(input)
+
+    x, y, z = xyz
+    xex = zeros(Cdouble, 4)
+
+    # x faces
+
+    output = input[1], droplast(input[2]), droplast(input[3])
+    cartesian = CartesianIndices(output)
+
+    for index in cartesian
+        n = linear[index]
+        i, j, k = Tuple(index)
+
+        moms[1][n] = vofinit!(xex, f, x[i],
+                                      SVector(y[j], y[j+1]),
+                                      SVector(z[k], z[k+1]))
+    end
+
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+    for index in halo
+        n = linear[index]
+
+        moms[1][n] = bc(eltype(moms[1]))
+    end
+
+    # y faces
+
+    output = droplast(input[1]), input[2], droplast(input[3])
+    cartesian = CartesianIndices(output)
+
+    for index in cartesian
+        n = linear[index]
+        i, j, k = Tuple(index)
+
+        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      y[j],
+                                      SVector(z[k], z[k+1]))
+    end
+
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+    for index in halo
+        n = linear[index]
+
+        moms[2][n] = bc(eltype(moms[2]))
+    end
+
+    # z faces
+
+    output = droplast(input[1]), droplast(input[2]), input[3]
+    cartesian = CartesianIndices(output)
+
+    for index in cartesian
+        n = linear[index]
+        i, j, k = Tuple(index)
+
+        moms[3][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+                                      SVector(y[j], y[j+1]),
+                                      z[k])
+    end
+
+    halo = EdgeIterator(CartesianIndices(input), cartesian)
+
+    for index in halo
+        n = linear[index]
+
+        moms[3][n] = bc(eltype(moms[3]))
+    end
+
+    return moms
 end
