@@ -2,12 +2,13 @@ using CartesianGeometry
 using Test
 
 @testset "CartesianGeometry.jl" begin
-    range = 1:8
+    outer = 1:9
+    inner = 1:8
 
-    x = collocated(identity, range, range)
+    x = collocated(identity, outer, inner)
     @test first(x) == zero(eltype(x))
     @test last(x) == one(eltype(x))
 
-    x = staggered(identity, range, range)
-    @test 2length(x) * first(x) == one(eltype(x))
+    x = staggered(identity, outer, inner)
+    @test 2length(inner) * first(x) == one(eltype(x))
 end
