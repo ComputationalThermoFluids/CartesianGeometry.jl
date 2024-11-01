@@ -1,12 +1,15 @@
 """
 
-    integrate(T, f, xyz, axs, bary)
+integrate(T::Type{<:Tuple}, f, xyz, S, bc, bary)
 
 Computes volume- (`T=Tuple{0}`) and surface-specific (`T=Tuple{1}`) apertures of the second kind.
 
 # Arguments
 
-- `axs`: the indices of `xyz` for which `bary` is defined.
+- `f`: Level set function.
+- `xyz::NTuple{N}`: the Cartesian coordinates of the lattice nodes.
+- `bc`: Boundary condition.
+- `bary`: Barycenters.
 
 !!! warning
 
