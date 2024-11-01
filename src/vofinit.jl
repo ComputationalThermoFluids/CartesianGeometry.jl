@@ -18,7 +18,7 @@ end
     Even if cell is empty, return full centroid coordinates.
 
 """
-function vofinit!(xex, f, x::SVector; nex=Cint.((1, 0)))
+function vofinit!(xex, f, x::SVector; nex=Cint.((1, 1)))
     t = SVector{2}(f(i) for i in x)
 
     val = x[2] - x[1]
@@ -85,7 +85,7 @@ end
 Call Vofi 2.0 for exact integration.
 
 """
-function vofinit!(xex, f, x::SVector, y::SVector; nex=Cint.((1, 0)))
+function vofinit!(xex, f, x::SVector, y::SVector; nex=Cint.((1, 1)))
     t = SMatrix{2,2}(f(i, j) for i in x, j in y)
 
     val = (x[2] - x[1]) * (y[2] - y[1])
@@ -164,7 +164,7 @@ end
 Call Vofi 2.0 for exact integration.
 
 """
-function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 0)))
+function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 1)))
     t = SArray{Tuple{2,2,2}}(f(i, j, k) for i in x, j in y, k in z)
 
     val = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1])
