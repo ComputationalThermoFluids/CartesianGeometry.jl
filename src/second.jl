@@ -1,12 +1,15 @@
 """
 
-    integrate(T, f, xyz, axs, bary)
+integrate(T::Type{<:Tuple}, f, xyz, S, bc, bary)
 
 Computes volume- (`T=Tuple{0}`) and surface-specific (`T=Tuple{1}`) apertures of the second kind.
 
 # Arguments
 
-- `axs`: the indices of `xyz` for which `bary` is defined.
+- `f`: Level set function.
+- `xyz::NTuple{N}`: the Cartesian coordinates of the lattice nodes.
+- `bc`: Boundary condition.
+- `bary`: Barycenters.
 
 !!! warning
 
@@ -383,7 +386,7 @@ function integrate!(moms, ::Type{Tuple{1}},
 
     # x faces
 
-    output = axs[1], droplast(input[2]), droplast(input[3])
+    output = droplast(input[1]), droplast(input[2]), droplast(input[3])
     cartesian = CartesianIndices(output)
 
     for index in cartesian
@@ -405,7 +408,7 @@ function integrate!(moms, ::Type{Tuple{1}},
 
     # y faces
 
-    output = droplast(input[1]), axs[2], droplast(input[3])
+    output = droplast(input[1]), droplast(input[2]), droplast(input[3])
     cartesian = CartesianIndices(output)
 
     for index in cartesian
@@ -428,7 +431,7 @@ function integrate!(moms, ::Type{Tuple{1}},
 
     # z faces
 
-    output = droplast(input[1]), droplast(input[2]), axs[3]
+    output = droplast(input[1]), droplast(input[2]), droplast(input[3])
     cartesian = CartesianIndices(output)
 
     for index in cartesian
