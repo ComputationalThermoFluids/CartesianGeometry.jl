@@ -89,7 +89,6 @@ end
 
             v[n] = @ncall($N, vofinit!, xex, f, y)
             bary[n] = @ncall($N, SVector, d -> xex[d])
-            @show $N+1
             interface_norm[n] = xex[end]
         end
 
