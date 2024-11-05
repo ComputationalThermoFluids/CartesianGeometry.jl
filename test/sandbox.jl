@@ -1,5 +1,5 @@
 using CartesianGeometry
-
+using Test
 const T=Float64
 
 universe = (-1:11, -1:19)
@@ -36,11 +36,17 @@ surf = integrate(Tuple{1}, levelset, xyz, T, zero)
 @assert all(isequal.(length.(surf), prod(length.(universe))))
 =#
 
-V, bary = integrate(Tuple{0}, levelset, xyz, T, nan)
+V, bary, interface_length = integrate(Tuple{0}, levelset, xyz, T, nan)
 As = integrate(Tuple{1}, levelset, xyz, T, nan)
 
 Ws = integrate(Tuple{0}, levelset, xyz, T, nan, bary)
 Bs = integrate(Tuple{1}, levelset, xyz, T, nan, bary)
+
+@test size(V) == size(bary) == size(interface_length)
+
+@show V
+@show bary
+@show interface_length
 
 # second-kind moments
 #tmp = integrate(Tuple{0}, levelset, xyz, bary)
