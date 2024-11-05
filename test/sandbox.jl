@@ -1,5 +1,5 @@
 using CartesianGeometry
-
+using Test
 const T=Float64
 
 universe = (-1:11, -1:19)
@@ -44,6 +44,9 @@ Bs = integrate(Tuple{1}, levelset, xyz, T, nan, bary)
 
 @test size(V) == size(bary) == size(interface_length)
 
+@show V
+@show bary
+@show interface_length
 
 # second-kind moments
 #tmp = integrate(Tuple{0}, levelset, xyz, bary)

@@ -18,7 +18,7 @@ end
     Even if cell is empty, return full centroid coordinates.
 
 """
-function vofinit!(xex, f, x::SVector; nex=Cint.((1, 1)))
+function vofinit!(xex, f, x::SVector; nex=Cint.((1, 0)))
     t = SVector{2}(f(i) for i in x)
 
     val = x[2] - x[1]
@@ -82,7 +82,7 @@ end
 
 """
 
-Call Vofi 2.0 for exact integration.
+Call Vofi 2.0 for exact integration. ###
 
 """
 function vofinit!(xex, f, x::SVector, y::SVector; nex=Cint.((1, 1)))
@@ -93,12 +93,14 @@ function vofinit!(xex, f, x::SVector, y::SVector; nex=Cint.((1, 1)))
     if all(isnonpositive, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
+        xex[end] = zero(xex[1])
         return val
     end
 
     if all(isnonnegative, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
+        xex[end] = zero(xex[1])
         return zero(val)
     end
 
@@ -173,6 +175,7 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 1)))
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
         xex[3] = sum(z) / 2
+        xex[end] = zero(xex[1])
         return val
     end
 
@@ -180,6 +183,7 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 1)))
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
         xex[3] = sum(z) / 2
+        xex[end] = zero(xex[1])
         return zero(val)
     end
 
