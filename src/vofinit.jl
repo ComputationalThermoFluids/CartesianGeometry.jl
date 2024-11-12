@@ -192,3 +192,15 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 1)))
 
     val * getcc(f, x0, h0, xex, Cint(3); nex)
 end
+
+function get_cell_type(f, x::SVector{2}, y::SVector{2})
+    x0 = Cdouble.((x[1], y[1], 0.0))
+    h0 = Cdouble.((x[2] - x[1], y[2] - y[1], 1.0))
+    return getcelltype(f, x0, h0, Cint(2))
+end
+
+function get_cell_type(f, x::SVector{2}, y::SVector{2}, z::SVector{2})
+    x0 = Cdouble.((x[1], y[1], z[1]))
+    h0 = Cdouble.((x[2] - x[1], y[2] - y[1], z[2] - z[1]))
+    return getcelltype(f, x0, h0, Cint(3))
+end

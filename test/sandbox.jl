@@ -36,7 +36,7 @@ surf = integrate(Tuple{1}, levelset, xyz, T, zero)
 @assert all(isequal.(length.(surf), prod(length.(universe))))
 =#
 
-V, bary, interface_length = integrate(Tuple{0}, levelset, xyz, T, nan)
+V, bary, interface_length, cell_types = integrate(Tuple{0}, levelset, xyz, T, nan)
 As = integrate(Tuple{1}, levelset, xyz, T, nan)
 
 Ws = integrate(Tuple{0}, levelset, xyz, T, nan, bary)
@@ -47,6 +47,27 @@ Bs = integrate(Tuple{1}, levelset, xyz, T, nan, bary)
 @show V
 @show bary
 @show interface_length
+
+# Calculate Perimeter of the circle
+# Remove NaN values
+interface_length = interface_length[.!isnan.(interface_length)]
+println(sum(interface_length))
+println(2 * π * R)
+
+@assert isapprox(sum(interface_length), 2 * π * R, atol=1e-7)
+
+# Cell types
+@show cell_types
+
+# Verify that indices with cell_types == -1 have corresponding interface_length values
+indices = findall(cell_types .== -1)
+indices_inter = findall(interface_length .> 0)
+@show length(indices)
+@show length(indices_inter)
+
+# Print me only th interface_length[indices] values
+@show interface_length[indices]
+@show interface_length[indices_inter]
 
 # second-kind moments
 #tmp = integrate(Tuple{0}, levelset, xyz, bary)

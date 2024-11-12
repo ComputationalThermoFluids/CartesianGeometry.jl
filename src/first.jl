@@ -59,8 +59,9 @@ function integrate(::Type{Tuple{0}}, f, xyz, T, bc)
     v = Vector{T}(undef, len)
     bary = Vector{SVector{N,T}}(undef, len)
     interface_norm = Vector{T}(undef, len)
+    cell_types = Vector{T}(undef, len) 
 
-    integrate!((v, bary, interface_norm), Tuple{0}, f, xyz, bc)
+    integrate!((v, bary, interface_norm, cell_types), Tuple{0}, f, xyz, bc)
 end
 
 # ND volume
@@ -75,7 +76,7 @@ end
         linear = LinearIndices(input)
         cartesian = CartesianIndices(output)
 
-        (v, bary, interface_norm) = moms
+        (v, bary, interface_norm, cell_types) = moms
         @ntuple($N, x) = xyz
 
         xex = zeros(Cdouble, 4)
@@ -90,6 +91,9 @@ end
             v[n] = @ncall($N, vofinit!, xex, f, y)
             bary[n] = @ncall($N, SVector, d -> xex[d])
             interface_norm[n] = xex[end]
+
+            cell_types[n] = @ncall($N, get_cell_type, f, y)
+
         end
 
         # boundary conditions
@@ -101,6 +105,7 @@ end
             v[n] = bc(eltype(v))
             bary[n] = bc(eltype(bary))
             interface_norm[n] = bc(eltype(interface_norm))
+            cell_types[n] = bc(eltype(cell_types))
         end
 
         return moms
