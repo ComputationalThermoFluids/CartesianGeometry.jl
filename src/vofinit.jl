@@ -18,18 +18,20 @@ end
     Even if cell is empty, return full centroid coordinates.
 
 """
-function vofinit!(xex, f, x::SVector; nex=Cint.((1, 0)))
+function vofinit!(xex, f, x::SVector; nex=Cint.((1, 1)))
     t = SVector{2}(f(i) for i in x)
 
     val = x[2] - x[1]
 
     if all(isnonpositive, t)
         isone(first(nex)) && (xex[1] = sum(x) / 2)
+        isone(last(nex)) && (xex[end] = zero(xex[1]))
         return val
     end
 
     if all(isnonnegative, t)
         isone(first(nex)) && (xex[1] = sum(x) / 2)
+        isone(last(nex)) && (xex[end] = zero(xex[1]))
         return zero(val)
     end
 
@@ -37,11 +39,13 @@ function vofinit!(xex, f, x::SVector; nex=Cint.((1, 0)))
 
     if isnonnegative(t[1])
         isone(first(nex)) && (xex[1] = (ξ + x[2]) / 2)
+        isone(last(nex)) && (xex[end] = 1.0)
         return x[2] - ξ
     end
 
     if isnonnegative(t[2])
         isone(first(nex)) && (xex[1] = (x[1] + ξ) / 2)
+        isone(last(nex)) && (xex[end] = 1.0)
         return ξ - x[1]
     end
 
@@ -193,6 +197,22 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 1)))
     val * getcc(f, x0, h0, xex, Cint(3); nex)
 end
 
+function get_cell_type(f, x::SVector{2})
+    t = SVector{2}(f(i) for i in x)
+    if all(isnonpositive, t)
+        return 1.0
+    end
+    if all(isnonnegative, t)
+        return 0.0
+    end
+    if isnonnegative(t[1])
+        return -1.0
+    end
+    if isnonnegative(t[2])
+        return -1.0
+    end
+    nothing
+end
 function get_cell_type(f, x::SVector{2}, y::SVector{2})
     x0 = Cdouble.((x[1], y[1], 0.0))
     h0 = Cdouble.((x[2] - x[1], y[2] - y[1], 1.0))
