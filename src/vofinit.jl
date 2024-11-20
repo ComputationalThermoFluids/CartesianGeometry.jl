@@ -82,10 +82,10 @@ end
 
 """
 
-Call Vofi 2.0 for exact integration.
+Call Vofi 2.0 for exact integration. ###
 
 """
-function vofinit!(xex, f, x::SVector, y::SVector; nex=Cint.((1, 0)))
+function vofinit!(xex, f, x::SVector, y::SVector; nex=Cint.((1, 1)))
     t = SMatrix{2,2}(f(i, j) for i in x, j in y)
 
     val = (x[2] - x[1]) * (y[2] - y[1])
@@ -93,12 +93,14 @@ function vofinit!(xex, f, x::SVector, y::SVector; nex=Cint.((1, 0)))
     if all(isnonpositive, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
+        xex[end] = zero(xex[1])
         return val
     end
 
     if all(isnonnegative, t)
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
+        xex[end] = zero(xex[1])
         return zero(val)
     end
 
@@ -164,7 +166,7 @@ end
 Call Vofi 2.0 for exact integration.
 
 """
-function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 0)))
+function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 1)))
     t = SArray{Tuple{2,2,2}}(f(i, j, k) for i in x, j in y, k in z)
 
     val = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1])
@@ -173,6 +175,7 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 0)))
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
         xex[3] = sum(z) / 2
+        xex[end] = zero(xex[1])
         return val
     end
 
@@ -180,6 +183,7 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 0)))
         xex[1] = sum(x) / 2
         xex[2] = sum(y) / 2
         xex[3] = sum(z) / 2
+        xex[end] = zero(xex[1])
         return zero(val)
     end
 
@@ -187,4 +191,16 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 0)))
     h0 = Cdouble.((x[2]-x[1], y[2]-y[1], z[2]-z[1]))
 
     val * getcc(f, x0, h0, xex, Cint(3); nex)
+end
+
+function get_cell_type(f, x::SVector{2}, y::SVector{2})
+    x0 = Cdouble.((x[1], y[1], 0.0))
+    h0 = Cdouble.((x[2] - x[1], y[2] - y[1], 1.0))
+    return getcelltype(f, x0, h0, Cint(2))
+end
+
+function get_cell_type(f, x::SVector{2}, y::SVector{2}, z::SVector{2})
+    x0 = Cdouble.((x[1], y[1], z[1]))
+    h0 = Cdouble.((x[2] - x[1], y[2] - y[1], z[2] - z[1]))
+    return getcelltype(f, x0, h0, Cint(3))
 end

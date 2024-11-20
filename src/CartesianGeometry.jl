@@ -10,7 +10,7 @@ using Vofinit
 export nan
 export HyperSphere
 export collocated, staggered
-export integrate, integrate!
+export integrate, integrate!, get_cell_type
 
 include("utils.jl")
 include("zoo.jl")
