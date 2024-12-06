@@ -84,6 +84,9 @@ function marching_squares(x, y, phi::Array{Float64,2})
                 Bx[i-1,j-1] = 0.0
                 By[i-1,j-1] = 0.0
 
+                Wx[i-1,j-1] = 0.0
+                Wy[i-1,j-1] = 0.0
+
 
             elseif iso == 15
                 cell_type[i-1,j-1] = 1  # Full cell
@@ -100,6 +103,9 @@ function marching_squares(x, y, phi::Array{Float64,2})
                 Ay[i-1,j-1] = Δx  # Length of the top edge
                 Bx[i-1,j-1] = Δy  # Length of the horizontal center edge
                 By[i-1,j-1] = Δx  # Length of the vertical center edge
+
+                Wx[i-1,j-1] = Δy*Δx
+                Wy[i-1,j-1] = Δy*Δx
 
             else
                 cell_type[i-1,j-1] = -1  # Cut cell
@@ -200,6 +206,9 @@ function marching_squares(x, y, phi::Array{Float64,2})
                 centroids[(i-1, j-1)] = (Cx, Cy)
                 V[i-1, j-1] = abs(area)
 
+                # Compute Wx and Wy for cut cells
+
+
                 # Compute Bx and By for cut cells
                 # Bx corresponds to the wetted length along the horizontal center edge
                 # By corresponds to the wetted length along the vertical center edge
@@ -208,7 +217,7 @@ function marching_squares(x, y, phi::Array{Float64,2})
             end
         end
     end
-    return cell_type, intersection_points, centroids, V, interface_centroids, Ax, Ay
+    return cell_type, intersection_points, centroids, V, interface_centroids, Ax, Ay, Wx, Wy, Bx, By
 end
 
 # Example usage
@@ -219,18 +228,22 @@ y = range(-1.0, 1.0, length=ny+1)
 phi = zeros(Float64, nx+1, ny+1)
 
 # Level set function for a circle centered at (0,0) with radius 0.5
-for i in 1:nx+1
-    for j in 1:ny+1
+for j in 1:ny+1
+    for i in 1:nx+1
         phi[i,j] = (sqrt(x[i]^2 + y[j]^2) - 0.5)
     end
 end
 
 # Classify the cells, find intersection points, and compute centroids and V
-@time cell_types, intersection_points, centroids, V, interface_centroids, Ax, Ay = marching_squares(x, y, phi)
+@time cell_types, intersection_points, centroids, V, interface_centroids, Ax, Ay, Wx, Wy, Bx, By = marching_squares(x, y, phi)
 
 # Display the results
 println("Number of cells: ($(size(cell_types,1)), $(size(cell_types,2)))")
 println("Number of centroids: $(length(centroids))")
+
+# Visualize the cell types
+heatmap(cell_types', aspect_ratio=:equal, c=:viridis, xlabel="x", ylabel="y", title="Cell Types")
+readline()
 
 # Visualize the cell V
 heatmap(V', aspect_ratio=:equal, c=:viridis, xlabel="x", ylabel="y", title="Cell V")
@@ -240,6 +253,12 @@ readline()
 heatmap(Ax', aspect_ratio=:equal, c=:viridis, xlabel="x", ylabel="y", title="Face Capacity Ax")
 readline()
 heatmap(Ay', aspect_ratio=:equal, c=:viridis, xlabel="x", ylabel="y", title="Face Capacity Ay")
+readline()
+
+# Visualize the cell Wx and Wy
+heatmap(Wx', aspect_ratio=:equal, c=:viridis, xlabel="x", ylabel="y", title="Cell Wx")
+readline()
+heatmap(Wy', aspect_ratio=:equal, c=:viridis, xlabel="x", ylabel="y", title="Cell Wy")
 readline()
 
 
