@@ -12,11 +12,13 @@ export HyperSphere
 export collocated, staggered
 export integrate, integrate!, get_cell_type
 
+
 include("utils.jl")
 include("zoo.jl")
 include("mesh.jl")
 include("vofinit.jl")
 include("first.jl")
 include("second.jl")
+include("implicitint.jl")
 
 end
