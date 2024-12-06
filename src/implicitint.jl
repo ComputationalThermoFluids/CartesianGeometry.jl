@@ -1,6 +1,5 @@
 using ImplicitIntegration
 using Plots
-Plots.default(show = true)
 
 # Define the mesh
 nx, ny = 20, 20
@@ -17,7 +16,7 @@ y_center = [0.5*(y_coords[j] + y_coords[j+1]) for j in 1:ny]
 ϕ = (x) -> sqrt((x[1]-0.5)^2 + (x[2]-0.5)^2) - 0.25  # Example: unit circle
 
 function compute_volume(ϕ, a, b)
-    return integrate((x) -> 1, ϕ, a, b).val
+    return ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
 end
 
 # Compute the volume for each cell
@@ -48,9 +47,9 @@ cell_types = zeros(Int, nx, ny)
 end
 
 function compute_cell_centroid(ϕ, a, b)
-    area = integrate((x) -> 1, ϕ, a, b).val
-    x_centroid = integrate((x) -> x[1], ϕ, a, b).val / area
-    y_centroid = integrate((x) -> x[2], ϕ, a, b).val / area
+    area = ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
+    x_centroid = ImplicitIntegration.integrate((x) -> x[1], ϕ, a, b).val / area
+    y_centroid = ImplicitIntegration.integrate((x) -> x[2], ϕ, a, b).val / area
     return (x_centroid, y_centroid)
 end
 
@@ -80,9 +79,9 @@ scatter!(repeat(x_center, 1, ny), repeat(y_center', nx, 1), markersize=5, c=:bla
 scatter!(reshape([c[1] for c in centroids], nx, ny), reshape([c[2] for c in centroids], nx, ny), markersize=5, c=:red, legend=false)
 
 function compute_interface_centroid(ϕ, a, b)
-    area = integrate((x) -> 1, ϕ, a, b,surface=true).val
-    x_centroid = integrate((x) -> x[1], ϕ, a, b, surface=true).val / area
-    y_centroid = integrate((x) -> x[2], ϕ, a, b, surface=true).val / area
+    area = ImplicitIntegration.integrate((x) -> 1, ϕ, a, b,surface=true).val
+    x_centroid = ImplicitIntegration.integrate((x) -> x[1], ϕ, a, b, surface=true).val / area
+    y_centroid = ImplicitIntegration.integrate((x) -> x[2], ϕ, a, b, surface=true).val / area
     return (x_centroid, y_centroid)
 end
 
@@ -108,14 +107,14 @@ scatter!(interface_centroid_x, interface_centroid_y, markersize=5, c=:blue, lege
 function compute_Wx(ϕ, xi, xip1, yj, yjp1)
     a = (xi, yj)
     b = (xip1, yjp1)
-    return integrate((x) -> 1, ϕ, a, b).val
+    return ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
 end
 
 # Function to compute staggered volume W_y at (i, j+1/2)
 function compute_Wy(ϕ, xi, xip1, yj, yjp1)
     a = (xi, yj)
     b = (xip1, yjp1)
-    return integrate((x) -> 1, ϕ, a, b).val
+    return ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
 end
 
 # Compute staggered volumes W_x and W_y
@@ -155,7 +154,7 @@ function compute_Ax(ϕ, xi_half, yj_minus_half, yj_plus_half)
     a = (y0,)
     b = (y1,)
     ϕ_1d = (y) -> ϕ([x_fixed, y[1]])
-    result = integrate((y) -> 1.0, ϕ_1d, a, b)
+    result = ImplicitIntegration.integrate((y) -> 1.0, ϕ_1d, a, b)
     return result.val
 end
 
@@ -170,7 +169,7 @@ function compute_Ay(ϕ, xi_minus_half, xi_plus_half, yj_half)
     a = (x0,)
     b = (x1,)
     ϕ_1d = (x) -> ϕ([x[1], y_fixed])
-    result = integrate((x) -> 1.0, ϕ_1d, a, b)
+    result = ImplicitIntegration.integrate((x) -> 1.0, ϕ_1d, a, b)
     return result.val
 end
 
@@ -211,7 +210,7 @@ function compute_Bx(ϕ, xi_half, yj_minus_half, yj_plus_half)
     a = (y0,)
     b = (y1,)
     ϕ_1d = (y) -> ϕ([x_fixed, y[1]])
-    result = integrate((y) -> 1.0, ϕ_1d, a, b)
+    result = ImplicitIntegration.integrate((y) -> 1.0, ϕ_1d, a, b)
     return result.val
 end
 
@@ -226,7 +225,7 @@ function compute_By(ϕ, xi_minus_half, xi_plus_half, yj_half)
     a = (x0,)
     b = (x1,)
     ϕ_1d = (x) -> ϕ([x[1], y_fixed])
-    result = integrate((x) -> 1.0, ϕ_1d, a, b)
+    result = ImplicitIntegration.integrate((x) -> 1.0, ϕ_1d, a, b)
     return result.val
 end
 
