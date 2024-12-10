@@ -1,256 +1,412 @@
 using ImplicitIntegration
-using Plots
 
-# Define the mesh
-nx, ny = 20, 20
-dx, dy = 1/nx, 1/ny
-x0, y0 = 0.0, 0.0
+# Utilities
+isfull(val, full_val) = isapprox(val, full_val; atol=1e-8)
+isempty(val) = isapprox(val, 0.0; atol=1e-8)
 
-x_coords = [x0 + i*dx for i in 0:nx]
-y_coords = [y0 + j*dy for j in 0:ny]
+########################
+# 1D Implementation
+########################
 
-x_center = [0.5*(x_coords[i] + x_coords[i+1]) for i in 1:nx]
-y_center = [0.5*(y_coords[j] + y_coords[j+1]) for j in 1:ny]
+function implicit_integration(mesh::Tuple{Vector}, Φ)
+    x_coords = mesh[1]
+    nx = length(x_coords)-1
+    dx = x_coords[2] - x_coords[1]
 
-# Level-set function (example)
-ϕ = (x) -> sqrt((x[1]-0.5)^2 + (x[2]-0.5)^2) - 0.25  # Example: unit circle
-
-function compute_volume(ϕ, a, b)
-    return ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
-end
-
-# Compute the volume for each cell
-volumes = zeros(nx, ny)
-@time for i in 1:nx
-    for j in 1:ny
-        volumes[i, j] = compute_volume(ϕ, (x_coords[i], y_coords[j]), (x_coords[i+1], y_coords[j+1]))
+    # Compute volumes (1D length segments)
+    V = zeros(nx)
+    for i in 1:nx
+        a = (x_coords[i],)
+        b = (x_coords[i+1],)
+        V[i] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
     end
-end
 
-# Plot volumes
-heatmap(x_center, y_center, volumes, aspect_ratio=1, c=:viridis, legend=false)
-
-# Classify cells
-cell_types = zeros(Int, nx, ny)
-
-@time for i in 1:nx
-    for j in 1:ny
-        vol = volumes[i, j]
-        if isapprox(vol, 0.0; atol=1e-8)
-            cell_types[i, j] = 0  # Empty cell
-        elseif isapprox(vol, dx * dy; atol=1e-8)
-            cell_types[i, j] = 1  # Full cell
+    # Classify cells
+    cell_types = similar(V, Int)
+    for i in 1:nx
+        if isempty(V[i])
+            cell_types[i] = 0
+        elseif isfull(V[i], dx)
+            cell_types[i] = 1
         else
-            cell_types[i, j] = -1  # Cut cell
+            cell_types[i] = -1
         end
     end
-end
 
-function compute_cell_centroid(ϕ, a, b)
-    area = ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
-    x_centroid = ImplicitIntegration.integrate((x) -> x[1], ϕ, a, b).val / area
-    y_centroid = ImplicitIntegration.integrate((x) -> x[2], ϕ, a, b).val / area
-    return (x_centroid, y_centroid)
-end
-
-# Compute the centroid for each cell
-centroids = Array{Tuple{Float64, Float64}, 2}(undef, nx, ny)
-
-result = 0.0
-@time for i in 1:nx
-    for j in 1:ny
-        a = (x_coords[i], y_coords[j])
-        b = (x_coords[i+1], y_coords[j+1])
-        result = compute_cell_centroid(ϕ, a, b)
-        if isnan(result[1]) || isnan(result[2])
-            centroids[i, j] = (0.5*(x_coords[i] + x_coords[i+1]), 0.5*(y_coords[j] + y_coords[j+1]))
+    # Compute cell centroids
+    C_ω = zeros(nx) # cell centroids
+    for i in 1:nx
+        a = (x_coords[i],)
+        b = (x_coords[i+1],)
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        if area > 0
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b).val / area
+            C_ω[i] = isnan(x_c) ? 0.5*(x_coords[i]+x_coords[i+1]) : x_c
         else
-            centroids[i, j] = result
+            C_ω[i] = 0.5*(x_coords[i]+x_coords[i+1])
         end
     end
-end
 
-# Extract centroids for plotting
-centroid_x = [c[1] for c in centroids]
-centroid_y = [c[2] for c in centroids]
-
-# Plot centroids
-scatter!(repeat(x_center, 1, ny), repeat(y_center', nx, 1), markersize=5, c=:black, legend=false)
-scatter!(reshape([c[1] for c in centroids], nx, ny), reshape([c[2] for c in centroids], nx, ny), markersize=5, c=:red, legend=false)
-
-function compute_interface_centroid(ϕ, a, b)
-    area = ImplicitIntegration.integrate((x) -> 1, ϕ, a, b,surface=true).val
-    x_centroid = ImplicitIntegration.integrate((x) -> x[1], ϕ, a, b, surface=true).val / area
-    y_centroid = ImplicitIntegration.integrate((x) -> x[2], ϕ, a, b, surface=true).val / area
-    return (x_centroid, y_centroid)
-end
-
-# Compute the interface centroid for each cell
-interface_centroids = Array{Union{Nothing, Tuple{Float64, Float64}}, 2}(undef, nx, ny)
-
-@time for i in 1:nx
-    for j in 1:ny
-        a = (x_coords[i], y_coords[j])
-        b = (x_coords[i+1], y_coords[j+1])
-        interface_centroids[i, j] = compute_interface_centroid(ϕ, a, b)
+    # Compute interface centroids
+    C_γ = zeros(nx)
+    Γ = zeros(nx)
+    for i in 1:nx
+        a = (x_coords[i],)
+        b = (x_coords[i+1],)
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true).val
+        if area > 0
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true).val / area
+            C_γ[i] = x_c
+            Γ[i] = area
+        else
+            C_γ[i] = NaN
+            Γ[i] = 0.0
+        end
     end
+
+    # Compute W (staggered volumes)
+    Wx = zeros(nx+1)
+    for i in 1:nx+1
+        xi = x_coords[max(i-1,1)]
+        xip1 = x_coords[min(i,nx+1)]
+        Wx[i] = ImplicitIntegration.integrate((x)->1, Φ, (xi,), (xip1,)).val
+    end
+    W = (Wx,)
+
+    # Compute A (faces capacity)
+    Ax = zeros(nx+1)
+    for i in 1:nx+1
+        Ax[i] = Φ((x_coords[i],)) ≤ 0.0 ? 1.0 : 0.0
+    end
+    A = (Ax,)
+
+    # Compute B (values at cell centroids):
+    Bx = zeros(nx)
+    for i in 1:nx
+        xi = C_ω[i]
+        Bx[i] = Φ((xi,)) ≤ 0.0 ? 1.0 : 0.0
+    end
+    B = (Bx,)
+
+    return V, cell_types, C_ω, C_γ, Γ, W, A, B
 end
 
-# Extract centroids for plotting
-interface_centroid_x = [c[1] for c in interface_centroids if c !== nothing]
-interface_centroid_y = [c[2] for c in interface_centroids if c !== nothing]
+########################
+# 2D Implementation
+########################
 
-# Plot interface centroids
-scatter!(interface_centroid_x, interface_centroid_y, markersize=5, c=:blue, legend=false)
+function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
+    x_coords, y_coords = mesh
+    nx = length(x_coords)-1
+    ny = length(y_coords)-1
+    dx = x_coords[2]-x_coords[1]
+    dy = y_coords[2]-y_coords[1]
 
-# Function to compute staggered volume W_x at (i+1/2, j)
-function compute_Wx(ϕ, xi, xip1, yj, yjp1)
-    a = (xi, yj)
-    b = (xip1, yjp1)
-    return ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
-end
+    # Volumes (areas)
+    V = zeros(nx, ny)
+    for i in 1:nx
+        for j in 1:ny
+            a = (x_coords[i], y_coords[j])
+            b = (x_coords[i+1], y_coords[j+1])
+            V[i,j] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        end
+    end
 
-# Function to compute staggered volume W_y at (i, j+1/2)
-function compute_Wy(ϕ, xi, xip1, yj, yjp1)
-    a = (xi, yj)
-    b = (xip1, yjp1)
-    return ImplicitIntegration.integrate((x) -> 1, ϕ, a, b).val
-end
+    # Cell types
+    cell_types = similar(V, Int)
+    for i in 1:nx
+        for j in 1:ny
+            vol = V[i,j]
+            if isempty(vol)
+                cell_types[i,j] = 0
+            elseif isfull(vol, dx*dy)
+                cell_types[i,j] = 1
+            else
+                cell_types[i,j] = -1
+            end
+        end
+    end
 
-# Compute staggered volumes W_x and W_y
-Wx = zeros(nx+1, ny)
-Wy = zeros(nx, ny+1)
+    # Cell centroids
+    C_ω = Array{Tuple{Float64,Float64}}(undef, nx, ny)
+    for i in 1:nx
+        for j in 1:ny
+            a = (x_coords[i], y_coords[j])
+            b = (x_coords[i+1], y_coords[j+1])
+            area = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+            if area > 0
+                x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b).val / area
+                y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b).val / area
+                x_c = isnan(x_c) ? 0.5*(x_coords[i]+x_coords[i+1]) : x_c
+                y_c = isnan(y_c) ? 0.5*(y_coords[j]+y_coords[j+1]) : y_c
+                C_ω[i,j] = (x_c,y_c)
+            else
+                C_ω[i,j] = (0.5*(x_coords[i]+x_coords[i+1]), 0.5*(y_coords[j]+y_coords[j+1]))
+            end
+        end
+    end
 
-# Compute W_x at x_{i+1/2}, y_j
-for i in 1:nx+1
-    xi = x_coords[max(i-1, 1)]
-    xip1 = x_coords[min(i, nx+1)]
+    # Interface centroids
+    C_γ = Array{Union{Nothing,Tuple{Float64,Float64}}}(undef, nx, ny)
+    Γ = zeros(nx, ny)
+    for i in 1:nx
+        for j in 1:ny
+            a = (x_coords[i], y_coords[j])
+            b = (x_coords[i+1], y_coords[j+1])
+            area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true).val
+            if area > 0
+                x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true).val / area
+                y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true).val / area
+                C_γ[i,j] = (x_c,y_c)
+                Γ[i,j] = area
+            else
+                C_γ[i,j] = nothing
+                Γ[i,j] = 0.0
+            end
+        end
+    end
+
+    # Staggered volumes W
+    Wx = zeros(nx+1, ny)
+    Wy = zeros(nx, ny+1)
+    for i in 1:nx+1
+        for j in 1:ny
+            xi = x_coords[max(i-1,1)]
+            xip1 = x_coords[min(i,nx+1)]
+            yj = y_coords[j]
+            yjp1 = y_coords[j+1]
+            Wx[i,j] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj), (xip1,yjp1)).val
+        end
+    end
+    for i in 1:nx
+        for j in 1:ny+1
+            xi = x_coords[i]
+            xip1 = x_coords[i+1]
+            yj = y_coords[max(j-1,1)]
+            yjp1 = y_coords[min(j,ny+1)]
+            Wy[i,j] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj), (xip1,yjp1)).val
+        end
+    end
+    W = (Wx, Wy)
+
+    # Face capacities A (Ax, Ay)
+    Ax = zeros(nx+1, ny)
+    Ay = zeros(nx, ny+1)
+    # For Ax (line x fixed, integrate over y):
+    for i in 1:nx+1
+        xi = x_coords[i]
+        for j in 1:ny
+            yj = y_coords[j]
+            yjp1 = y_coords[j+1]
+            # 1D integration in y with x fixed:
+            ϕ_1d = y -> Φ((xi,y[1]))
+            Ax[i,j] = ImplicitIntegration.integrate((y)->1.0, ϕ_1d, (yj,),(yjp1,)).val
+        end
+    end
+    # For Ay (line y fixed, integrate over x):
+    for j in 1:ny+1
+        yj = y_coords[j]
+        for i in 1:nx
+            xi = x_coords[i]
+            xip1 = x_coords[i+1]
+            ϕ_1d = x -> Φ((x[1],yj))
+            Ay[i,j] = ImplicitIntegration.integrate((x)->1.0, ϕ_1d, (xi,),(xip1,)).val
+        end
+    end
+    A = (Ax, Ay)
+
+    # B (Bx, By) - integrate similarly but at cell centroids or using given logic
+    # Here we use a simplified logic: check sign of Φ at centroid:
+    Bx = zeros(nx, ny)
+    By = zeros(nx, ny)
+    for i in 1:nx
+        xi = C_ω[i,1]
+        for j in 1:ny
+            yj_min = y_coords[j]
+            yj_max = y_coords[j+1]
+            Φ_1d = (y) -> Φ((xi,y[1]))
+            Bx[i,j] = ImplicitIntegration.integrate((y)->1.0, Φ_1d, (yj_min,),(yj_max,)).val ≤ 0.0 ? 1.0 : 0.0
+        end
+    end
     for j in 1:ny
+        yj = C_ω[1,j]
+        for i in 1:nx
+            xi_min = x_coords[i]
+            xi_max = x_coords[i+1]
+            Φ_1d = (x) -> Φ((x[1],yj))
+            By[i,j] = ImplicitIntegration.integrate((x)->1.0, Φ_1d, (xi_min,),(xi_max,)).val ≤ 0.0 ? 1.0 : 0.0
+        end
+    end
+    B = (Bx, By)
+
+    return V, cell_types, C_ω, C_γ, Γ, W, A, B
+end
+
+########################
+# 3D Implementation
+########################
+
+function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
+    x_coords, y_coords, z_coords = mesh
+    nx = length(x_coords)-1
+    ny = length(y_coords)-1
+    nz = length(z_coords)-1
+    dx = x_coords[2]-x_coords[1]
+    dy = y_coords[2]-y_coords[1]
+    dz = z_coords[2]-z_coords[1]
+
+    # Volume
+    V = zeros(nx, ny, nz)
+    for i in 1:nx, j in 1:ny, k in 1:nz
+        a = (x_coords[i], y_coords[j], z_coords[k])
+        b = (x_coords[i+1], y_coords[j+1], z_coords[k+1])
+        V[i,j,k] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+    end
+
+    # Cell types
+    cell_types = similar(V, Int)
+    for i in 1:nx, j in 1:ny, k in 1:nz
+        vol = V[i,j,k]
+        if isempty(vol)
+            cell_types[i,j,k] = 0
+        elseif isfull(vol, dx*dy*dz)
+            cell_types[i,j,k] = 1
+        else
+            cell_types[i,j,k] = -1
+        end
+    end
+
+    # Cell centroids
+    C_ω = Array{Tuple{Float64,Float64,Float64}}(undef, nx, ny, nz)
+    for i in 1:nx, j in 1:ny, k in 1:nz
+        a = (x_coords[i], y_coords[j], z_coords[k])
+        b = (x_coords[i+1], y_coords[j+1], z_coords[k+1])
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        if area > 0
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b).val / area
+            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b).val / area
+            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b).val / area
+            x_c = isnan(x_c) ? 0.5*(x_coords[i]+x_coords[i+1]) : x_c
+            y_c = isnan(y_c) ? 0.5*(y_coords[j]+y_coords[j+1]) : y_c
+            z_c = isnan(z_c) ? 0.5*(z_coords[k]+z_coords[k+1]) : z_c
+            C_ω[i,j,k] = (x_c,y_c,z_c)
+        else
+            C_ω[i,j,k] = (0.5*(x_coords[i]+x_coords[i+1]),
+                          0.5*(y_coords[j]+y_coords[j+1]),
+                          0.5*(z_coords[k]+z_coords[k+1]))
+        end
+    end
+
+    # Interface centroids
+    C_γ = Array{Union{Nothing,Tuple{Float64,Float64,Float64}},3}(undef, nx, ny, nz)
+    for i in 1:nx, j in 1:ny, k in 1:nz
+        a = (x_coords[i], y_coords[j], z_coords[k])
+        b = (x_coords[i+1], y_coords[j+1], z_coords[k+1])
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true).val
+        if area > 0
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true).val / area
+            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true).val / area
+            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b, surface=true).val / area
+            C_γ[i,j,k] = (x_c,y_c,z_c)
+        else
+            C_γ[i,j,k] = nothing
+        end
+    end
+    Γ = C_γ
+
+    # Staggered volumes W = (Wx, Wy, Wz)
+    Wx = zeros(nx+1, ny, nz)
+    Wy = zeros(nx, ny+1, nz)
+    Wz = zeros(nx, ny, nz+1)
+    for i in 1:nx+1, j in 1:ny, k in 1:nz
+        xi = x_coords[max(i-1,1)]
+        xip1 = x_coords[min(i,nx+1)]
         yj = y_coords[j]
         yjp1 = y_coords[j+1]
-        Wx[i, j] = compute_Wx(ϕ, xi, xip1, yj, yjp1)
+        zj = z_coords[k]
+        zjp1 = z_coords[k+1]
+        Wx[i,j,k] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zj), (xip1,yjp1,zjp1)).val
+    end
+    for i in 1:nx, j in 1:ny+1, k in 1:nz
+        xi = x_coords[i]
+        xip1 = x_coords[i+1]
+        yj = y_coords[max(j-1,1)]
+        yjp1 = y_coords[min(j,ny+1)]
+        zj = z_coords[k]
+        zjp1 = z_coords[k+1]
+        Wy[i,j,k] = ImplicitIntegration/integrate((x)->1, Φ, (xi,yj,zj), (xip1,yjp1,zjp1)).val
+    end
+    for i in 1:nx, j in 1:ny, k in 1:nz+1
+        xi = x_coords[i]
+        xip1 = x_coords[i+1]
+        yj = y_coords[j]
+        yjp1 = y_coords[j+1]
+        zj = z_coords[max(k-1,1)]
+        zjp1 = z_coords[min(k,nz+1)]
+        Wz[i,j,k] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zj), (xip1,yjp1,zjp1)).val
+    end
+    W = (Wx, Wy, Wz)
+
+    # A = (Ax, Ay, Az), integrating over faces with one coordinate fixed
+    # Here we just replicate logic similar to 2D, extended to 3D
+    Ax = zeros(nx+1, ny, nz)
+    for i in 1:nx+1, j in 1:ny, k in 1:nz
+        xi = x_coords[i]
+        y0, y1 = y_coords[j], y_coords[j+1]
+        z0, z1 = z_coords[k], z_coords[k+1]
+        ϕ_2d = (y,z) -> Φ((xi,y,z))
+        Ax[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (y0,z0), (y1,z1)).val
+    end
+
+    Ay = zeros(nx, ny+1, nz)
+    for i in 1:nx, j in 1:ny+1, k in 1:nz
+        yj = y_coords[j]
+        x0, x1 = x_coords[i], x_coords[i+1]
+        z0, z1 = z_coords[k], z_coords[k+1]
+        ϕ_2d = (x,z) -> Φ((x,yj,z))
+        Ay[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (x0,z0), (x1,z1)).val
+    end
+
+    Az = zeros(nx, ny, nz+1)
+    for i in 1:nx, j in 1:ny, k in 1:nz+1
+        zk = z_coords[k]
+        x0, x1 = x_coords[i], x_coords[i+1]
+        y0, y1 = y_coords[j], y_coords[j+1]
+        ϕ_2d = (x,y) -> Φ((x,y,zk))
+        Az[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (x0,y0), (x1,y1)).val
+    end
+    A = (Ax, Ay, Az)
+
+    # B = (Bx, By, Bz)
+    # For simplicity, evaluate Φ at cell centroid and check sign
+    Bx = zeros(nx, ny, nz)
+    By = zeros(nx, ny, nz)
+    Bz = zeros(nx, ny, nz)
+    for i in 1:nx, j in 1:ny, k in 1:nz
+        (xc,yc,zc) = C_ω[i,j,k]
+        val = Φ((xc,yc,zc)) ≤ 0.0 ? 1.0 : 0.0
+        Bx[i,j,k] = val
+        By[i,j,k] = val
+        Bz[i,j,k] = val
+    end
+    B = (Bx, By, Bz)
+
+    return V, cell_types, C_ω, C_γ, Γ, W, A, B
+end
+
+########################
+# Generic dispatcher
+########################
+
+function implicit_integration(mesh, Φ)
+    N = length(mesh)
+    if N == 1
+        return implicit_integration(mesh::Tuple{Vector}, Φ)
+    elseif N == 2
+        return implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
+    elseif N == 3
+        return implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
+    else
+        error("Only 1D, 2D, or 3D meshes are supported.")
     end
 end
-
-# Compute W_y at x_i, y_{j+1/2}
-for i in 1:nx
-    xi = x_coords[i]
-    xip1 = x_coords[i+1]
-    for j in 1:ny+1
-        yj = y_coords[max(j-1, 1)]
-        yjp1 = y_coords[min(j, ny+1)]
-        Wy[i, j] = compute_Wy(ϕ, xi, xip1, yj, yjp1)
-    end
-end
-
-# Function to compute Ax at x_{i+1/2}, y_j
-function compute_Ax(ϕ, xi_half, yj_minus_half, yj_plus_half)
-    # Define the fixed x coordinate
-    x_fixed = xi_half
-    # Define the lower and upper y coordinates
-    y0 = yj_minus_half
-    y1 = yj_plus_half
-    # Perform 1D integration over y with x fixed
-    a = (y0,)
-    b = (y1,)
-    ϕ_1d = (y) -> ϕ([x_fixed, y[1]])
-    result = ImplicitIntegration.integrate((y) -> 1.0, ϕ_1d, a, b)
-    return result.val
-end
-
-# Function to compute Ay at x_i, y_{j+1/2}
-function compute_Ay(ϕ, xi_minus_half, xi_plus_half, yj_half)
-    # Define the fixed y coordinate
-    y_fixed = yj_half
-    # Define the lower and upper x coordinates
-    x0 = xi_minus_half
-    x1 = xi_plus_half
-    # Perform 1D integration over x with y fixed
-    a = (x0,)
-    b = (x1,)
-    ϕ_1d = (x) -> ϕ([x[1], y_fixed])
-    result = ImplicitIntegration.integrate((x) -> 1.0, ϕ_1d, a, b)
-    return result.val
-end
-
-# Compute Ax and Ay for the mesh
-Ax = zeros(nx+1, ny)
-Ay = zeros(nx, ny+1)
-
-# Compute Ax at x_{i+1/2}, y_j
-for i in 1:nx+1
-    xi_half = x_coords[i]
-    for j in 1:ny
-        yj_minus_half = y_coords[j]
-        yj_plus_half = y_coords[j+1]
-        Ax[i, j] = compute_Ax(ϕ, xi_half, yj_minus_half, yj_plus_half)
-    end
-end
-
-# Compute Ay at x_i, y_{j+1/2}
-for i in 1:nx
-    xi_minus_half = x_coords[i]
-    xi_plus_half = x_coords[i+1]
-    for j in 1:ny+1
-        yj_half = y_coords[j]
-        Ay[i, j] = compute_Ay(ϕ, xi_minus_half, xi_plus_half, yj_half)
-    end
-end
-
-heatmap(Ay, aspect_ratio=1, c=:viridis)
-
-# Function to compute Bx at x_i, y_j
-function compute_Bx(ϕ, xi_half, yj_minus_half, yj_plus_half)
-    # Define the fixed x coordinate
-    x_fixed = xi_half
-    # Define the lower and upper y coordinates
-    y0 = yj_minus_half
-    y1 = yj_plus_half
-    # Perform 1D integration over y with x fixed
-    a = (y0,)
-    b = (y1,)
-    ϕ_1d = (y) -> ϕ([x_fixed, y[1]])
-    result = ImplicitIntegration.integrate((y) -> 1.0, ϕ_1d, a, b)
-    return result.val
-end
-
-# Function to compute By at x_i, y_j
-function compute_By(ϕ, xi_minus_half, xi_plus_half, yj_half)
-    # Define the fixed y coordinate
-    y_fixed = yj_half
-    # Define the lower and upper x coordinates
-    x0 = xi_minus_half
-    x1 = xi_plus_half
-    # Perform 1D integration over x with y fixed
-    a = (x0,)
-    b = (x1,)
-    ϕ_1d = (x) -> ϕ([x[1], y_fixed])
-    result = ImplicitIntegration.integrate((x) -> 1.0, ϕ_1d, a, b)
-    return result.val
-end
-
-# Compute Bx and By for the mesh
-Bx = zeros(nx, ny)
-By = zeros(nx, ny)
-
-# Compute Bx at x_i, y_j
-for i in 1:nx
-    xi_half = centroid_x[i]
-    for j in 1:ny
-        yj_minus_half = y_coords[j]
-        yj_plus_half = y_coords[j+1]
-        Bx[i, j] = compute_Bx(ϕ, xi_half, yj_minus_half, yj_plus_half)
-    end
-end
-
-# Compute By at x_i, y_j
-for i in 1:nx
-    xi_minus_half = x_coords[i]
-    xi_plus_half = x_coords[i+1]
-    for j in 1:ny
-        yj_half = centroid_y[j]
-        By[i, j] = compute_By(ϕ, xi_minus_half, xi_plus_half, yj_half)
-    end
-end
-
-heatmap(Bx, aspect_ratio=1, c=:viridis)
