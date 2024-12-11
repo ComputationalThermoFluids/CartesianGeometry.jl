@@ -1,5 +1,3 @@
-using ImplicitIntegration
-
 # Utilities
 isfull(val, full_val) = isapprox(val, full_val; atol=1e-8)
 isempty(val) = isapprox(val, 0.0; atol=1e-8)
@@ -64,11 +62,11 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
         end
     end
 
-    # Compute W (staggered volumes)
+    # Compute W (staggered volumes) based on cell centroids
     Wx = zeros(nx+1)
     for i in 1:nx+1
-        xi = x_coords[max(i-1,1)]
-        xip1 = x_coords[min(i,nx+1)]
+        xi = C_ω[max(i-1,1)]
+        xip1 = C_ω[min(i,nx)]
         Wx[i] = ImplicitIntegration.integrate((x)->1, Φ, (xi,), (xip1,)).val
     end
     W = (Wx,)
@@ -170,20 +168,20 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
     Wx = zeros(nx+1, ny)
     Wy = zeros(nx, ny+1)
     for i in 1:nx+1
+        xi = C_ω[max(i-1,1),1][1]
+        xip1 = C_ω[min(i,nx),1][1]
         for j in 1:ny
-            xi = x_coords[max(i-1,1)]
-            xip1 = x_coords[min(i,nx+1)]
             yj = y_coords[j]
             yjp1 = y_coords[j+1]
             Wx[i,j] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj), (xip1,yjp1)).val
         end
     end
     for i in 1:nx
+        xi = x_coords[i]
+        xip1 = x_coords[i+1]
         for j in 1:ny+1
-            xi = x_coords[i]
-            xip1 = x_coords[i+1]
-            yj = y_coords[max(j-1,1)]
-            yjp1 = y_coords[min(j,ny+1)]
+            yj = C_ω[i,max(j-1,1)][2]
+            yjp1 = C_ω[i,min(j,ny)][2]
             Wy[i,j] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj), (xip1,yjp1)).val
         end
     end
@@ -219,7 +217,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
     Bx = zeros(nx, ny)
     By = zeros(nx, ny)
     for i in 1:nx
-        xi = C_ω[i,1]
+        xi = C_ω[i,1][1]
         for j in 1:ny
             yj_min = y_coords[j]
             yj_max = y_coords[j+1]
@@ -228,7 +226,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
         end
     end
     for j in 1:ny
-        yj = C_ω[1,j]
+        yj = C_ω[1,j][2]
         for i in 1:nx
             xi_min = x_coords[i]
             xi_max = x_coords[i+1]
