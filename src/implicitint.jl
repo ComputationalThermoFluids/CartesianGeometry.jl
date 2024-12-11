@@ -216,7 +216,6 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
     A = (Ax, Ay)
 
     # B (Bx, By) - integrate similarly but at cell centroids or using given logic
-    # Here we use a simplified logic: check sign of Φ at centroid:
     Bx = zeros(nx, ny)
     By = zeros(nx, ny)
     for i in 1:nx
@@ -225,7 +224,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             yj_min = y_coords[j]
             yj_max = y_coords[j+1]
             Φ_1d = (y) -> Φ((xi,y[1]))
-            Bx[i,j] = ImplicitIntegration.integrate((y)->1.0, Φ_1d, (yj_min,),(yj_max,)).val ≤ 0.0 ? 1.0 : 0.0
+            Bx[i,j] = ImplicitIntegration.integrate((y)->1.0, Φ_1d, (yj_min,),(yj_max,)).val
         end
     end
     for j in 1:ny
@@ -234,7 +233,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             xi_min = x_coords[i]
             xi_max = x_coords[i+1]
             Φ_1d = (x) -> Φ((x[1],yj))
-            By[i,j] = ImplicitIntegration.integrate((x)->1.0, Φ_1d, (xi_min,),(xi_max,)).val ≤ 0.0 ? 1.0 : 0.0
+            By[i,j] = ImplicitIntegration.integrate((x)->1.0, Φ_1d, (xi_min,),(xi_max,)).val
         end
     end
     B = (Bx, By)
@@ -299,6 +298,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
 
     # Interface centroids
     C_γ = Array{Union{Nothing,Tuple{Float64,Float64,Float64}},3}(undef, nx, ny, nz)
+    Γ = zeros(nx, ny, nz)
     for i in 1:nx, j in 1:ny, k in 1:nz
         a = (x_coords[i], y_coords[j], z_coords[k])
         b = (x_coords[i+1], y_coords[j+1], z_coords[k+1])
@@ -308,11 +308,12 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
             y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true).val / area
             z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b, surface=true).val / area
             C_γ[i,j,k] = (x_c,y_c,z_c)
+            Γ[i,j,k] = area
         else
             C_γ[i,j,k] = nothing
+            Γ[i,j,k] = 0.0
         end
     end
-    Γ = C_γ
 
     # Staggered volumes W = (Wx, Wy, Wz)
     Wx = zeros(nx+1, ny, nz)
@@ -334,7 +335,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         yjp1 = y_coords[min(j,ny+1)]
         zj = z_coords[k]
         zjp1 = z_coords[k+1]
-        Wy[i,j,k] = ImplicitIntegration/integrate((x)->1, Φ, (xi,yj,zj), (xip1,yjp1,zjp1)).val
+        Wy[i,j,k] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zj), (xip1,yjp1,zjp1)).val
     end
     for i in 1:nx, j in 1:ny, k in 1:nz+1
         xi = x_coords[i]
@@ -350,30 +351,42 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
     # A = (Ax, Ay, Az), integrating over faces with one coordinate fixed
     # Here we just replicate logic similar to 2D, extended to 3D
     Ax = zeros(nx+1, ny, nz)
-    for i in 1:nx+1, j in 1:ny, k in 1:nz
-        xi = x_coords[i]
-        y0, y1 = y_coords[j], y_coords[j+1]
-        z0, z1 = z_coords[k], z_coords[k+1]
-        ϕ_2d = (y,z) -> Φ((xi,y,z))
-        Ax[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (y0,z0), (y1,z1)).val
+    for i in 1:nx+1
+        for j in 1:ny 
+            for k in 1:nz
+                xi = x_coords[i]
+                y0, y1 = y_coords[j], y_coords[j+1]
+                z0, z1 = z_coords[k], z_coords[k+1]
+                ϕ_2d = (y,z) -> Φ((xi,y,z))
+                Ax[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (y0,z0), (y1,z1)).val
+            end
+        end
     end
 
     Ay = zeros(nx, ny+1, nz)
-    for i in 1:nx, j in 1:ny+1, k in 1:nz
-        yj = y_coords[j]
-        x0, x1 = x_coords[i], x_coords[i+1]
-        z0, z1 = z_coords[k], z_coords[k+1]
-        ϕ_2d = (x,z) -> Φ((x,yj,z))
-        Ay[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (x0,z0), (x1,z1)).val
+    for i in 1:nx
+        for j in 1:ny+1
+            for k in 1:nz
+                yj = y_coords[j]
+                x0, x1 = x_coords[i], x_coords[i+1]
+                z0, z1 = z_coords[k], z_coords[k+1]
+                ϕ_2d = (x,z) -> Φ((x,yj,z))
+                Ay[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (x0,z0), (x1,z1)).val
+            end
+        end
     end
 
     Az = zeros(nx, ny, nz+1)
-    for i in 1:nx, j in 1:ny, k in 1:nz+1
-        zk = z_coords[k]
-        x0, x1 = x_coords[i], x_coords[i+1]
-        y0, y1 = y_coords[j], y_coords[j+1]
-        ϕ_2d = (x,y) -> Φ((x,y,zk))
-        Az[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (x0,y0), (x1,y1)).val
+    for i in 1:nx
+        for j in 1:ny
+            for k in 1:nz+1
+                zk = z_coords[k]
+                x0, x1 = x_coords[i], x_coords[i+1]
+                y0, y1 = y_coords[j], y_coords[j+1]
+                ϕ_2d = (x,y) -> Φ((x,y,zk))
+                Az[i,j,k] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (x0,y0), (x1,y1)).val
+            end
+        end
     end
     A = (Ax, Ay, Az)
 
@@ -382,31 +395,49 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
     Bx = zeros(nx, ny, nz)
     By = zeros(nx, ny, nz)
     Bz = zeros(nx, ny, nz)
-    for i in 1:nx, j in 1:ny, k in 1:nz
-        (xc,yc,zc) = C_ω[i,j,k]
-        val = Φ((xc,yc,zc)) ≤ 0.0 ? 1.0 : 0.0
-        Bx[i,j,k] = val
-        By[i,j,k] = val
-        Bz[i,j,k] = val
+    for i in 1:nx
+        xi = C_ω[i,1,1]
+        for j in 1:ny
+            yj = y_coords[j]
+            yjmax = y_coords[j+1]
+            for k in 1:nz
+                zk = z_coords[k]
+                zkmax = z_coords[k+1]
+                Φ_2d = (y,z) -> Φ((xi,y,z))
+                Bx[i,j,k] = ImplicitIntegration.integrate((y,z)->1.0, Φ_2d, (yj,zk), (yjmax,zkmax)).val
+            end
+        end
     end
+
+    for j in 1:ny
+        yj = C_ω[1,j,1]
+        for i in 1:nx
+            xi = x_coords[i]
+            ximax = x_coords[i+1]
+            for k in 1:nz
+                zk = z_coords[k]
+                zkmax = z_coords[k+1]
+                Φ_2d = (x,z) -> Φ((x,yj,z))
+                By[i,j,k] = ImplicitIntegration.integrate((x,z)->1.0, Φ_2d, (xi,zk), (ximax,zkmax)).val
+            end
+        end
+    end
+
+    for k in 1:nz
+        zk = C_ω[1,1,k]
+        for i in 1:nx
+            xi = x_coords[i]
+            ximax = x_coords[i+1]
+            for j in 1:ny
+                yj = y_coords[j]
+                yjmax = y_coords[j+1]
+                Φ_2d = (x,y) -> Φ((x,y,zk))
+                Bz[i,j,k] = ImplicitIntegration.integrate((x,y)->1.0, Φ_2d, (xi,yj), (ximax,yjmax)).val
+            end
+        end
+    end
+
     B = (Bx, By, Bz)
 
     return V, cell_types, C_ω, C_γ, Γ, W, A, B
-end
-
-########################
-# Generic dispatcher
-########################
-
-function implicit_integration(mesh, Φ)
-    N = length(mesh)
-    if N == 1
-        return implicit_integration(mesh::Tuple{Vector}, Φ)
-    elseif N == 2
-        return implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
-    elseif N == 3
-        return implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
-    else
-        error("Only 1D, 2D, or 3D meshes are supported.")
-    end
 end
