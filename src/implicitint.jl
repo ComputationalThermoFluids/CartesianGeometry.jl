@@ -12,7 +12,7 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     dx = x_coords[2] - x_coords[1]
 
     # Compute volumes (1D length segments)
-    V = zeros(nx)
+    V = zeros(nx+1)
     for i in 1:nx
         a = (x_coords[i],)
         b = (x_coords[i+1],)
@@ -20,7 +20,7 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     end
 
     # Classify cells
-    cell_types = similar(V, Int)
+    cell_types = zeros(nx+1)
     for i in 1:nx
         if isempty(V[i])
             cell_types[i] = 0
@@ -32,7 +32,7 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     end
 
     # Compute cell centroids
-    C_ω = zeros(nx) # cell centroids
+    C_ω = zeros(nx+1) # cell centroids
     for i in 1:nx
         a = (x_coords[i],)
         b = (x_coords[i+1],)
@@ -46,8 +46,8 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     end
 
     # Compute interface centroids
-    C_γ = zeros(nx)
-    Γ = zeros(nx)
+    C_γ = zeros(nx+1)
+    Γ = zeros(nx+1)
     for i in 1:nx
         a = (x_coords[i],)
         b = (x_coords[i+1],)
@@ -61,7 +61,6 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
             Γ[i] = 0.0
         end
     end
-
     # Compute W (staggered volumes) based on cell centroids
     Wx = zeros(nx+1)
     for i in 1:nx+1
@@ -79,12 +78,16 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     A = (Ax,)
 
     # Compute B (values at cell centroids):
-    Bx = zeros(nx)
+    Bx = zeros(nx+1)
     for i in 1:nx
         xi = C_ω[i]
         Bx[i] = Φ((xi,)) ≤ 0.0 ? 1.0 : 0.0
     end
     B = (Bx,)
+
+    # Convert C_ω to Vector of SVector
+    C_ω = [SVector{1,Float64}([x]) for x in C_ω]
+    C_γ = [SVector{1,Float64}([x]) for x in C_γ]
 
     return V, cell_types, C_ω, C_γ, Γ, W, A, B
 end

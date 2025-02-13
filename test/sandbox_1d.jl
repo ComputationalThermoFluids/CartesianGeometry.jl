@@ -28,18 +28,19 @@ As = integrate(Tuple{1}, levelset, mesh, T, zero)
 Ws = integrate(Tuple{0}, levelset, mesh, T, zero, bary)
 Bs = integrate(Tuple{1}, levelset, mesh, T, zero, bary)
 
-@show Bs
-
+@show interface_length
+@show length(interface_length)
 # Test ImplicitIntegration
 nx = 10
 dx = 1.0/nx
 x0 = 0.0
-mesh = ([x0 + i*dx for i in 0:nx],)
+mesh = ([x0 + i*dx for i in 0:nx-1],)
 
 levelset = (x) -> (x[1] - 0.5)
 
 V1, cell_types1, C_ω1, C_γ1, Γ1, W1, A1, B1 = implicit_integration(mesh, levelset)
 
-@show B1
+@show Γ1
+@show length(Γ1)
 
 @test cell_types1 == cell_types
