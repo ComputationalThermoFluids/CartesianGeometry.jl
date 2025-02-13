@@ -104,26 +104,28 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
     dy = y_coords[2]-y_coords[1]
 
     # Volumes (areas)
-    V = zeros(nx, ny)
+    V = zeros((nx+1)*(ny+1))
     for i in 1:nx
         for j in 1:ny
+            idx = (i-1)*(ny+1) + j
             a = (x_coords[i], y_coords[j])
             b = (x_coords[i+1], y_coords[j+1])
-            V[i,j] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+            V[idx] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
         end
     end
 
     # Cell types
-    cell_types = similar(V, Int)
+    cell_types = zeros((nx+1)*(ny+1))
     for i in 1:nx
         for j in 1:ny
-            vol = V[i,j]
+            idx = (i-1)*(ny+1) + j
+            vol = V[idx]
             if isempty(vol)
-                cell_types[i,j] = 0
+                cell_types[idx] = 0
             elseif isfull(vol, dx*dy)
-                cell_types[i,j] = 1
+                cell_types[idx] = 1
             else
-                cell_types[i,j] = -1
+                cell_types[idx] = -1
             end
         end
     end
@@ -168,8 +170,8 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
     end
 
     # Staggered volumes W
-    Wx = zeros(nx+1, ny)
-    Wy = zeros(nx, ny+1)
+    Wx = zeros(nx+1, ny+1)
+    Wy = zeros(nx+1, ny+1)
     for i in 1:nx+1
         xi = C_ω[max(i-1,1),1][1]
         xip1 = C_ω[min(i,nx),1][1]
@@ -188,6 +190,11 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             Wy[i,j] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj), (xip1,yjp1)).val
         end
     end
+
+    # Convert Wx, Wy to Vector : Flatten
+    Wx = vec(Wx)
+    Wy = vec(Wy)
+    
     W = (Wx, Wy)
 
     # Face capacities A (Ax, Ay)
