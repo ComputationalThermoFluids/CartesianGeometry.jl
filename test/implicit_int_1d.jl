@@ -7,7 +7,7 @@ const T = Float64
 @testset "1D Geometry Integration" begin
     # Setup mesh and level set
     R = 0.2
-    a = 0.5
+    a = 0.42
     nx = 10
     dx = 1.0/nx
     x0 = 0.0
@@ -24,8 +24,8 @@ const T = Float64
     Bs = integrate(Tuple{1}, levelset, mesh, T, zero, bary)
 
     # Now test the implicit integration (new feature)
-    mesh2 = ([x0 + i*dx for i in 0:nx-1],) # NOTE THAT THE MESH IS DIFFERENT
-    levelset2 = (x) -> (x[1] - 0.5)  # simple 1D levelset function
+    mesh2 = ([x0 + i*dx for i in 0:nx-1],) # same mesh
+    levelset2 = (x) -> (x[1] - a)  # simple 1D levelset function
 
     V1, cell_types1, C_ω1, C_γ1, Γ1, W1, A1, B1 = implicit_integration(mesh2, levelset2)
     
@@ -39,7 +39,7 @@ const T = Float64
 
     @test all(@. isapprox(V, V1, atol=1e-12))
     @test all(@. isapprox(cell_types, cell_types1, atol=1e-12))
-    #@test all(@. isapprox(interface_length, Γ1, atol=1e-12))
+    @test all(@. isapprox(interface_length, Γ1, atol=1e-12))
     @test all(@. isapprox(As, A1, atol=1e-12))  
     @test all(@. isapprox(Ws, W1, atol=1e-12))
     @test all(@. isapprox(Bs, B1, atol=1e-12))
