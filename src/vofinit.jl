@@ -197,6 +197,109 @@ function vofinit!(xex, f, x::SVector, y::SVector, z::SVector; nex=Cint.((1, 1)))
     val * getcc(f, x0, h0, xex, Cint(3); nex)
 end
 
+"""
+
+Call Vofi extended for exact 4D integration.
+
+"""
+function vofinit!(xex, f, x::SVector, y::SVector, z::SVector, w::SVector; nex=Cint.((1, 1)))
+    t = SArray{Tuple{2,2,2,2}}(f(i, j, k, l) for i in x, j in y, k in z, l in w)
+
+    val = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1]) * (w[2] - w[1])
+
+    if all(isnonpositive, t)
+        xex[1] = sum(x) / 2
+        xex[2] = sum(y) / 2
+        xex[3] = sum(z) / 2
+        xex[4] = sum(w) / 2
+        xex[end] = zero(xex[1])
+        return val
+    end
+
+    if all(isnonnegative, t)
+        xex[1] = sum(x) / 2
+        xex[2] = sum(y) / 2
+        xex[3] = sum(z) / 2
+        xex[4] = sum(w) / 2
+        xex[end] = zero(xex[1])
+        return zero(val)
+    end
+
+    x0 = Cdouble.((x[1], y[1], z[1], w[1]))
+    h0 = Cdouble.((x[2]-x[1], y[2]-y[1], z[2]-z[1], w[2]-w[1]))
+
+    val * getcc(f, x0, h0, xex, Cint(4); nex)
+end
+
+# Fonctions pour les combinaisons d'arguments 4D avec une dimension fixe
+function vofinit!(xex, f, x::Number, y::SVector{2}, z::SVector{2}, w::SVector{2})
+    t = SArray{Tuple{2,2,2}}(f(x, j, k, l) for j in y, k in z, l in w)
+
+    val = (y[2] - y[1]) * (z[2] - z[1]) * (w[2] - w[1])
+
+    all(isnonpositive, t) && return val
+    all(isnonnegative, t) && return zero(val)
+
+    x0 = Cdouble.((y[1], z[1], w[1]))
+    h0 = Cdouble.((y[2]-y[1], z[2]-z[1], w[2]-w[1]))
+
+    nex = Cint.((0, 0))
+    val * getcc(x0, h0, xex, Cint(3); nex) do y, z, w
+        f(x, y, z, w)
+    end
+end
+
+function vofinit!(xex, f, x::SVector{2}, y::Number, z::SVector{2}, w::SVector{2})
+    t = SArray{Tuple{2,2,2}}(f(i, y, k, l) for i in x, k in z, l in w)
+
+    val = (x[2] - x[1]) * (z[2] - z[1]) * (w[2] - w[1])
+
+    all(isnonpositive, t) && return val
+    all(isnonnegative, t) && return zero(val)
+
+    x0 = Cdouble.((x[1], z[1], w[1]))
+    h0 = Cdouble.((x[2]-x[1], z[2]-z[1], w[2]-w[1]))
+
+    nex = Cint.((0, 0))
+    val * getcc(x0, h0, xex, Cint(3); nex) do x, z, w
+        f(x, y, z, w)
+    end
+end
+
+function vofinit!(xex, f, x::SVector{2}, y::SVector{2}, z::Number, w::SVector{2})
+    t = SArray{Tuple{2,2,2}}(f(i, j, z, l) for i in x, j in y, l in w)
+
+    val = (x[2] - x[1]) * (y[2] - y[1]) * (w[2] - w[1])
+
+    all(isnonpositive, t) && return val
+    all(isnonnegative, t) && return zero(val)
+
+    x0 = Cdouble.((x[1], y[1], w[1]))
+    h0 = Cdouble.((x[2]-x[1], y[2]-y[1], w[2]-w[1]))
+
+    nex = Cint.((0, 0))
+    val * getcc(x0, h0, xex, Cint(3); nex) do x, y, w
+        f(x, y, z, w)
+    end
+end
+
+function vofinit!(xex, f, x::SVector{2}, y::SVector{2}, z::SVector{2}, w::Number)
+    t = SArray{Tuple{2,2,2}}(f(i, j, k, w) for i in x, j in y, k in z)
+
+    val = (x[2] - x[1]) * (y[2] - y[1]) * (z[2] - z[1])
+
+    all(isnonpositive, t) && return val
+    all(isnonnegative, t) && return zero(val)
+
+    x0 = Cdouble.((x[1], y[1], z[1]))
+    h0 = Cdouble.((x[2]-x[1], y[2]-y[1], z[2]-z[1]))
+
+    nex = Cint.((0, 0))
+    val * getcc(x0, h0, xex, Cint(3); nex) do x, y, z
+        f(x, y, z, w)
+    end
+end
+
 function get_cell_type(f, x::SVector{2})
     t = SVector{2}(f(i) for i in x)
     if all(isnonpositive, t)
@@ -223,4 +326,10 @@ function get_cell_type(f, x::SVector{2}, y::SVector{2}, z::SVector{2})
     x0 = Cdouble.((x[1], y[1], z[1]))
     h0 = Cdouble.((x[2] - x[1], y[2] - y[1], z[2] - z[1]))
     return getcelltype(f, x0, h0, Cint(3))
+end
+
+function get_cell_type(f, x::SVector{2}, y::SVector{2}, z::SVector{2}, w::SVector{2})
+    x0 = Cdouble.((x[1], y[1], z[1], w[1]))
+    h0 = Cdouble.((x[2] - x[1], y[2] - y[1], z[2] - z[1], w[2] - w[1]))
+    return getcelltype(f, x0, h0, Cint(4))
 end
