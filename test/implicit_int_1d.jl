@@ -18,10 +18,10 @@ const T = Float64
     levelset = (x, _=0) -> (x - a)
 
     # Compute moments using integrate for Tuple{0} and Tuple{1}
-    V, bary, interface_length, cell_types = integrate(Tuple{0}, levelset, mesh, T, zero)
-    As = integrate(Tuple{1}, levelset, mesh, T, zero)
-    Ws = integrate(Tuple{0}, levelset, mesh, T, zero, bary)
-    Bs = integrate(Tuple{1}, levelset, mesh, T, zero, bary)
+    V, bary, interface_length, cell_types = CartesianGeometry.integrate(Tuple{0}, levelset, mesh, T, zero)
+    As = CartesianGeometry.integrate(Tuple{1}, levelset, mesh, T, zero)
+    Ws = CartesianGeometry.integrate(Tuple{0}, levelset, mesh, T, zero, bary)
+    Bs = CartesianGeometry.integrate(Tuple{1}, levelset, mesh, T, zero, bary)
 
     # Now test the implicit integration (new feature)
     mesh2 = ([x0 + i*dx for i in 0:nx-1],) # same mesh

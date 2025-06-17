@@ -6,7 +6,7 @@ isempty(val) = isapprox(val, 0.0; atol=1e-8)
 # 1D Implementation
 ########################
 
-function implicit_integration(mesh::Tuple{Vector}, Φ)
+function implicit_integration(mesh::Tuple{Vector}, Φ; tol=1e-6)
     x_coords = mesh[1]
     nx = length(x_coords)-1
     dx = x_coords[2] - x_coords[1]
@@ -16,7 +16,7 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     for i in 1:nx
         a = (x_coords[i],)
         b = (x_coords[i+1],)
-        V[i] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        V[i] = ImplicitIntegration.integrate((x)->1, Φ, a, b;tol=tol).val
     end
 
     # Classify cells
@@ -36,9 +36,9 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     for i in 1:nx
         a = (x_coords[i],)
         b = (x_coords[i+1],)
-        area = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b;tol=tol).val
         if area > 0
-            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b).val / area
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b;tol=tol).val / area
             C_ω[i] = isnan(x_c) ? 0.5*(x_coords[i]+x_coords[i+1]) : x_c
         else
             C_ω[i] = 0.5*(x_coords[i]+x_coords[i+1])
@@ -51,9 +51,9 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     for i in 1:nx
         a = (x_coords[i],)
         b = (x_coords[i+1],)
-        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true).val
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true;tol=tol).val
         if area > 0
-            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true).val / area
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true;tol=tol).val / area
             C_γ[i] = x_c
             Γ[i] = area
         else
@@ -66,7 +66,7 @@ function implicit_integration(mesh::Tuple{Vector}, Φ)
     for i in 1:nx+1
         xi = C_ω[max(i-1,1)]
         xip1 = C_ω[min(i,nx)]
-        Wx[i] = ImplicitIntegration.integrate((x)->1, Φ, (xi,), (xip1,)).val
+        Wx[i] = ImplicitIntegration.integrate((x)->1, Φ, (xi,), (xip1,);tol=tol).val
     end
     W = (Wx,)
 
@@ -96,7 +96,7 @@ end
 # 2D Implementation
 ########################
 
-function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
+function implicit_integration(mesh::Tuple{Vector,Vector}, Φ; tol=1e-6)
     x_coords, y_coords = mesh
     nx = length(x_coords)-1
     ny = length(y_coords)-1
@@ -117,7 +117,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             idx = linear_idx(i, j)
             a = (x_coords[i], y_coords[j])
             b = (x_coords[i+1], y_coords[j+1])
-            V[idx] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+            V[idx] = ImplicitIntegration.integrate((x)->1, Φ, a, b;tol=tol).val
         end
     end
 
@@ -146,8 +146,8 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             b = (x_coords[i+1], y_coords[j+1])
             area = V[idx]  # Reuse the already computed volume
             if area > 0
-                x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b).val / area
-                y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b).val / area
+                x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b;tol=tol).val / area
+                y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b;tol=tol).val / area
                 x_c = isnan(x_c) ? 0.5*(x_coords[i]+x_coords[i+1]) : x_c
                 y_c = isnan(y_c) ? 0.5*(y_coords[j]+y_coords[j+1]) : y_c
                 C_ω[idx] = SVector{dim,Float64}(x_c, y_c)
@@ -165,10 +165,10 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             idx = linear_idx(i, j)
             a = (x_coords[i], y_coords[j])
             b = (x_coords[i+1], y_coords[j+1])
-            area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true).val
+            area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true;tol=tol).val
             if area > 0
-                x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true).val / area
-                y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true).val / area
+                x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true;tol=tol).val / area
+                y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true;tol=tol).val / area
                 C_γ[idx] = SVector{dim,Float64}(x_c, y_c)
                 Γ[idx] = area
             else
@@ -190,7 +190,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
         
         # Creating a 1D level set function where x is fixed
         ϕ_2d = (y) -> Φ((xi, y[1]))
-        Ax[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,), (yjp1,)).val
+        Ax[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,), (yjp1,);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny+1
@@ -201,7 +201,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
         
         # Creating a 2D level set function where y is fixed
         ϕ_2d = (x) -> Φ((x[1], yj))
-        Ay[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,), (xip1,)).val
+        Ay[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,), (xip1,);tol=tol).val
     end
     
     A = (Ax, Ay)
@@ -218,7 +218,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
         
         # Fixed x at centroid
         ϕ_2d = (y) -> Φ((c_x, y[1]))
-        Bx[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,), (yjp1,)).val
+        Bx[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,), (yjp1,);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny
@@ -229,7 +229,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
         
         # Fixed y at centroid
         ϕ_2d = (x) -> Φ((x[1], c_y))
-        By[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,), (xip1,)).val
+        By[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,), (xip1,);tol=tol).val
     end
 
     B = (Bx, By)
@@ -255,7 +255,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             b = (C_ω[right_idx][1], y_coords[j+1])
             
             # Integrate volume between centroids
-            Wx[idx] = ImplicitIntegration.integrate((x)->1.0, Φ, a, b).val
+            Wx[idx] = ImplicitIntegration.integrate((x)->1.0, Φ, a, b;tol=tol).val
         end
     end
     
@@ -276,7 +276,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector}, Φ)
             b = (x_coords[i+1], C_ω[top_idx][2])
             
             # Integrate volume between centroids
-            Wy[idx] = ImplicitIntegration.integrate((x)->1.0, Φ, a, b).val
+            Wy[idx] = ImplicitIntegration.integrate((x)->1.0, Φ, a, b;tol=tol).val
         end
     end
     
@@ -289,7 +289,7 @@ end
 # 3D Implementation
 ########################
 
-function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
+function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ;tol=1e-6)
     x_coords, y_coords, z_coords = mesh
     nx = length(x_coords)-1
     ny = length(y_coords)-1
@@ -313,7 +313,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         idx = linear_idx(i, j, k)
         a = (x_coords[i], y_coords[j], z_coords[k])
         b = (x_coords[i+1], y_coords[j+1], z_coords[k+1])
-        V[idx] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        V[idx] = ImplicitIntegration.integrate((x)->1, Φ, a, b;tol=tol).val
     end
 
     # Cell types
@@ -338,9 +338,9 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         b = (x_coords[i+1], y_coords[j+1], z_coords[k+1])
         area = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
         if area > 0
-            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b).val / area
-            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b).val / area
-            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b).val / area
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b;tol=tol).val / area
+            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b;tol=tol).val / area
+            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b;tol=tol).val / area
             x_c = isnan(x_c) ? 0.5*(x_coords[i]+x_coords[i+1]) : x_c
             y_c = isnan(y_c) ? 0.5*(y_coords[j]+y_coords[j+1]) : y_c
             z_c = isnan(z_c) ? 0.5*(z_coords[k]+z_coords[k+1]) : z_c
@@ -361,11 +361,11 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         idx = linear_idx(i, j, k)
         a = (x_coords[i], y_coords[j], z_coords[k])
         b = (x_coords[i+1], y_coords[j+1], z_coords[k+1])
-        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true).val
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true;tol=tol).val
         if area > 0
-            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true).val / area
-            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true).val / area
-            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b, surface=true).val / area
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true;tol=tol).val / area
+            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true;tol=tol).val / area
+            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b, surface=true;tol=tol).val / area
             C_γ[idx] = SVector{dim,Float64}(x_c, y_c, z_c)
             Γ[idx] = area
         else
@@ -394,7 +394,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         zk = z_coords[k]
         zkp1 = z_coords[k+1]
         
-        Wx[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk), (xip1,yjp1,zkp1)).val
+        Wx[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk), (xip1,yjp1,zkp1);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny+1, k in 1:nz
@@ -412,7 +412,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         zk = z_coords[k]
         zkp1 = z_coords[k+1]
         
-        Wy[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk), (xip1,yjp1,zkp1)).val
+        Wy[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk), (xip1,yjp1,zkp1);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny, k in 1:nz+1
@@ -430,7 +430,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         zk = C_ω[prev_idx][3]
         zkp1 = C_ω[next_idx][3]
         
-        Wz[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk), (xip1,yjp1,zkp1)).val
+        Wz[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk), (xip1,yjp1,zkp1);tol=tol).val
     end
     
     W = (Wx, Wy, Wz)
@@ -450,7 +450,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         
         # Creating a 2D level set function where x is fixed
         ϕ_2d = (y) -> Φ((xi, y[1], y[2]))
-        Ax[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,zk), (yjp1,zkp1)).val
+        Ax[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,zk), (yjp1,zkp1);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny+1, k in 1:nz
@@ -463,7 +463,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         
         # Creating a 2D level set function where y is fixed
         ϕ_2d = (x) -> Φ((x[1], yj, x[2]))
-        Ay[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,zk), (xip1,zkp1)).val
+        Ay[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,zk), (xip1,zkp1);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny, k in 1:nz+1
@@ -476,7 +476,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         
         # Creating a 2D level set function where z is fixed
         ϕ_2d = (x) -> Φ((x[1], x[2], zk))
-        Az[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,yj), (xip1,yjp1)).val
+        Az[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,yj), (xip1,yjp1);tol=tol).val
     end
     
     A = (Ax, Ay, Az)
@@ -496,7 +496,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         
         # Fixed x at centroid
         ϕ_2d = (y) -> Φ((c_x, y[1], y[2]))
-        Bx[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,zk), (yjp1,zkp1)).val
+        Bx[idx] = ImplicitIntegration.integrate((y)->1, ϕ_2d, (yj,zk), (yjp1,zkp1);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny, k in 1:nz
@@ -509,7 +509,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         
         # Fixed y at centroid
         ϕ_2d = (x) -> Φ((x[1], c_y, x[2]))
-        By[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,zk), (xip1,zkp1)).val
+        By[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,zk), (xip1,zkp1);tol=tol).val
     end
     
     for i in 1:nx, j in 1:ny, k in 1:nz
@@ -522,7 +522,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector}, Φ)
         
         # Fixed z at centroid
         ϕ_2d = (x) -> Φ((x[1], x[2], c_z))
-        Bz[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,yj), (xip1,yjp1)).val
+        Bz[idx] = ImplicitIntegration.integrate((x)->1, ϕ_2d, (xi,yj), (xip1,yjp1);tol=tol).val
     end
     
     B = (Bx, By, Bz)
@@ -534,7 +534,7 @@ end
 # 4D Implementation
 ########################
 
-function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
+function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ;tol=1e-6)
     x_coords, y_coords, z_coords, t_coords = mesh
     nx = length(x_coords)-1
     ny = length(y_coords)-1
@@ -560,7 +560,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         idx = linear_idx(i, j, k, l)
         a = (x_coords[i], y_coords[j], z_coords[k], t_coords[l])
         b = (x_coords[i+1], y_coords[j+1], z_coords[k+1], t_coords[l+1])
-        V[idx] = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        V[idx] = ImplicitIntegration.integrate((x)->1, Φ, a, b;tol=tol).val
     end
 
     # Cell types
@@ -583,12 +583,12 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         idx = linear_idx(i, j, k, l)
         a = (x_coords[i], y_coords[j], z_coords[k], t_coords[l])
         b = (x_coords[i+1], y_coords[j+1], z_coords[k+1], t_coords[l+1])
-        area = ImplicitIntegration.integrate((x)->1, Φ, a, b).val
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b;tol=tol).val
         if area > 0
-            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b).val / area
-            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b).val / area
-            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b).val / area
-            t_c = ImplicitIntegration.integrate((x)->x[4], Φ, a, b).val / area
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b;tol=tol).val / area
+            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b;tol=tol).val / area
+            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b;tol=tol).val / area
+            t_c = ImplicitIntegration.integrate((x)->x[4], Φ, a, b;tol=tol).val / area
             x_c = isnan(x_c) ? 0.5*(x_coords[i]+x_coords[i+1]) : x_c
             y_c = isnan(y_c) ? 0.5*(y_coords[j]+y_coords[j+1]) : y_c
             z_c = isnan(z_c) ? 0.5*(z_coords[k]+z_coords[k+1]) : z_c
@@ -611,12 +611,12 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         idx = linear_idx(i, j, k, l)
         a = (x_coords[i], y_coords[j], z_coords[k], t_coords[l])
         b = (x_coords[i+1], y_coords[j+1], z_coords[k+1], t_coords[l+1])
-        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true).val
+        area = ImplicitIntegration.integrate((x)->1, Φ, a, b, surface=true;tol=tol).val
         if area > 0
-            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true).val / area
-            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true).val / area
-            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b, surface=true).val / area
-            t_c = ImplicitIntegration.integrate((x)->x[4], Φ, a, b, surface=true).val / area
+            x_c = ImplicitIntegration.integrate((x)->x[1], Φ, a, b, surface=true;tol=tol).val / area
+            y_c = ImplicitIntegration.integrate((x)->x[2], Φ, a, b, surface=true;tol=tol).val / area
+            z_c = ImplicitIntegration.integrate((x)->x[3], Φ, a, b, surface=true;tol=tol).val / area
+            t_c = ImplicitIntegration.integrate((x)->x[4], Φ, a, b, surface=true;tol=tol).val / area
             C_γ[idx] = SVector{dim,Float64}(x_c, y_c, z_c, t_c)
             Γ[idx] = area
         else
@@ -649,7 +649,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         tl = t_coords[l]
         tlp1 = t_coords[l+1]
         
-        Wx[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1)).val
+        Wx[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1);tol=tol).val
     end
     
     # For Wy (staggered volume in y-direction)
@@ -670,7 +670,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         tl = t_coords[l]
         tlp1 = t_coords[l+1]
         
-        Wy[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1)).val
+        Wy[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1);tol=tol).val
     end
     
     # For Wz (staggered volume in z-direction)
@@ -691,7 +691,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         tl = t_coords[l]
         tlp1 = t_coords[l+1]
         
-        Wz[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1)).val
+        Wz[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1);tol=tol).val
     end
     
     # For Wt (staggered volume in t-direction)
@@ -712,7 +712,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         tl = C_ω[prev_idx][4]
         tlp1 = C_ω[next_idx][4]
         
-        Wt[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1)).val
+        Wt[idx] = ImplicitIntegration.integrate((x)->1, Φ, (xi,yj,zk,tl), (xip1,yjp1,zkp1,tlp1);tol=tol).val
     end
     
     W = (Wx, Wy, Wz, Wt)
@@ -736,7 +736,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Creating a 3D level set function where x is fixed
         ϕ_3d = (y) -> Φ((xi, y[1], y[2], y[3]))
-        Ax[idx] = ImplicitIntegration.integrate((y)->1, ϕ_3d, (yj,zk,tl), (yjp1,zkp1,tlp1)).val
+        Ax[idx] = ImplicitIntegration.integrate((y)->1, ϕ_3d, (yj,zk,tl), (yjp1,zkp1,tlp1);tol=tol).val
     end
     
     # For Ay (y-face capacity - XZT hyperplane at constant y)
@@ -752,7 +752,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Creating a 3D level set function where y is fixed
         ϕ_3d = (x) -> Φ((x[1], yj, x[2], x[3]))
-        Ay[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,zk,tl), (xip1,zkp1,tlp1)).val
+        Ay[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,zk,tl), (xip1,zkp1,tlp1);tol=tol).val
     end
     
     # For Az (z-face capacity - XYT hyperplane at constant z)
@@ -768,7 +768,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Creating a 3D level set function where z is fixed
         ϕ_3d = (x) -> Φ((x[1], x[2], zk, x[3]))
-        Az[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,tl), (xip1,yjp1,tlp1)).val
+        Az[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,tl), (xip1,yjp1,tlp1);tol=tol).val
     end
     
     # For At (t-face capacity - XYZ hyperplane at constant t)
@@ -784,7 +784,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Creating a 3D level set function where t is fixed
         ϕ_3d = (x) -> Φ((x[1], x[2], x[3], tl))
-        At[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,zk), (xip1,yjp1,zkp1)).val
+        At[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,zk), (xip1,yjp1,zkp1);tol=tol).val
     end
     
     A = (Ax, Ay, Az, At)
@@ -808,7 +808,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Fixed x at centroid
         ϕ_3d = (y) -> Φ((c_x, y[1], y[2], y[3]))
-        Bx[idx] = ImplicitIntegration.integrate((y)->1, ϕ_3d, (yj,zk,tl), (yjp1,zkp1,tlp1)).val
+        Bx[idx] = ImplicitIntegration.integrate((y)->1, ϕ_3d, (yj,zk,tl), (yjp1,zkp1,tlp1);tol=tol).val
     end
     
     # For By (y-boundary fraction at centroid)
@@ -824,7 +824,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Fixed y at centroid
         ϕ_3d = (x) -> Φ((x[1], c_y, x[2], x[3]))
-        By[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,zk,tl), (xip1,zkp1,tlp1)).val
+        By[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,zk,tl), (xip1,zkp1,tlp1);tol=tol).val
     end
     
     # For Bz (z-boundary fraction at centroid)
@@ -840,7 +840,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Fixed z at centroid
         ϕ_3d = (x) -> Φ((x[1], x[2], c_z, x[3]))
-        Bz[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,tl), (xip1,yjp1,tlp1)).val
+        Bz[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,tl), (xip1,yjp1,tlp1);tol=tol).val
     end
     
     # For Bt (t-boundary fraction at centroid)
@@ -856,7 +856,7 @@ function implicit_integration(mesh::Tuple{Vector,Vector,Vector,Vector}, Φ)
         
         # Fixed t at centroid
         ϕ_3d = (x) -> Φ((x[1], x[2], x[3], c_t))
-        Bt[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,zk), (xip1,yjp1,zkp1)).val
+        Bt[idx] = ImplicitIntegration.integrate((x)->1, ϕ_3d, (xi,yj,zk), (xip1,yjp1,zkp1);tol=tol).val
     end
     
     B = (Bx, By, Bz, Bt)
