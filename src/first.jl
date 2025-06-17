@@ -53,7 +53,7 @@ Wherever the moments can not be computed, the function `bc` is applied to the el
     To simplify the computation of second-kind moments, barycenters of `-f` are stored in empty cells.
 
 """
-function integrate(::Type{Tuple{0}}, f, xyz, T, bc)
+function integrate(::Type{Tuple{0}}, f, xyz, T, bc; method=:vofi)
     N, len = length(xyz), prod(length.(xyz))
 
     v = Vector{T}(undef, len)
@@ -61,39 +61,42 @@ function integrate(::Type{Tuple{0}}, f, xyz, T, bc)
     interface_norm = Vector{T}(undef, len)
     cell_types = Vector{T}(undef, len) 
 
-    integrate!((v, bary, interface_norm, cell_types), Tuple{0}, f, xyz, bc)
+    integrate!((v, bary, interface_norm, cell_types), Tuple{0}, f, xyz, bc; method=method)
 end
 
 # ND volume
 @generated function integrate!(moms, ::Type{Tuple{0}},
-                               f, xyz::NTuple{N}, bc) where {N}
+                              f, xyz::NTuple{N}, bc; method=:vofi) where {N}
     quote
-        # axes
+        # Mêmes axes et indices...
         input = only.(axes.(xyz))
         output = droplast.(input)
-
-        # indices
         linear = LinearIndices(input)
         cartesian = CartesianIndices(output)
 
         (v, bary, interface_norm, cell_types) = moms
         @ntuple($N, x) = xyz
-
         xex = zeros(Cdouble, 4)
 
         for index in cartesian
             n = linear[index]
-
             @ntuple($N, i) = Tuple(index)
-
             @nextract($N, y, d -> SVector(x_d[i_d], x_d[i_d+1]))
-
-            v[n] = @ncall($N, vofinit!, xex, f, y)
+            
+            # Utiliser la méthode spécifiée
+            v[n] = @ncall($N, vofinit_dispatch!, method, xex, f, y)
             bary[n] = @ncall($N, SVector, d -> xex[d])
             interface_norm[n] = xex[end]
-
-            cell_types[n] = @ncall($N, get_cell_type, f, y)
-
+            
+            # Déterminer le type de cellule
+            if method === :simple && $N == 2
+                # Cas spécial 2D avec SimpleVOF
+                cell_types[n] = SimpleVOF.getcelltype(f, 
+                                     (y_1[1], y_1[2]), (y_2[1], y_2[2]))
+            else
+                # Méthode par défaut
+                cell_types[n] = @ncall($N, get_cell_type, f, y)
+            end
         end
 
         # boundary conditions
@@ -181,14 +184,14 @@ Returns a `NTuple` where each element corresponds to  direction.
 - `bc`: the boundary condition (*e.g.* `nan` or `zero`).
 
 """
-function integrate(::Type{Tuple{1}}, f, xyz, T, bc)
+function integrate(::Type{Tuple{1}}, f, xyz, T, bc; method=:vofi)
     len = prod(length.(xyz))
 
     moms = map(xyz) do _
         Vector{T}(undef, len)
     end
 
-    integrate!(moms, Tuple{1}, f, xyz, bc)
+    integrate!(moms, Tuple{1}, f, xyz, bc; method=method)
 end
 
 # 1D surface
@@ -203,14 +206,14 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{1}, _)
     # x faces
 
     for n in linear
-        moms[1][n] = vofinit!(xex, f, x[n])
+        moms[1][n] = vofinit_dispatch!(method, xex, f, x[n])
     end
 
     return moms
 end
 
 # 2D surface
-function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2}, bc)
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2}, bc; method=:vofi)
 
     input = only.(axes.(xyz))
     linear = LinearIndices(input)
@@ -227,7 +230,7 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2}, bc)
         n = linear[index]
         i, j = Tuple(index)
 
-        moms[1][n] = vofinit!(xex, f, x[i],
+        moms[1][n] = vofinit_dispatch!(method, xex, f, x[i],
                                       SVector(y[j], y[j+1]))
     end
 
@@ -248,7 +251,7 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2}, bc)
         n = linear[index]
         i, j = Tuple(index)
 
-        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+        moms[2][n] = vofinit_dispatch!(method, xex, f, SVector(x[i], x[i+1]),
                                       y[j])
     end
 
@@ -264,7 +267,7 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{2}, bc)
 end
 
 # 3D surface
-function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3}, bc)
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3}, bc; method=:vofi)
 
     input = only.(axes.(xyz))
     linear = LinearIndices(input)
@@ -281,7 +284,7 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3}, bc)
         n = linear[index]
         i, j, k = Tuple(index)
 
-        moms[1][n] = vofinit!(xex, f, x[i],
+        moms[1][n] = vofinit_dispatch!(method, xex, f, x[i],
                                       SVector(y[j], y[j+1]),
                                       SVector(z[k], z[k+1]))
     end
@@ -303,7 +306,7 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3}, bc)
         n = linear[index]
         i, j, k = Tuple(index)
 
-        moms[2][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+        moms[2][n] = vofinit_dispatch!(method, xex, f, SVector(x[i], x[i+1]),
                                       y[j],
                                       SVector(z[k], z[k+1]))
     end
@@ -325,7 +328,7 @@ function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{3}, bc)
         n = linear[index]
         i, j, k = Tuple(index)
 
-        moms[3][n] = vofinit!(xex, f, SVector(x[i], x[i+1]),
+        moms[3][n] = vofinit_dispatch!(method, xex, f, SVector(x[i], x[i+1]),
                                       SVector(y[j], y[j+1]),
                                       z[k])
     end
