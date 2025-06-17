@@ -1,5 +1,7 @@
 module CartesianGeometry
 
+include("simplevof.jl")
+
 using Base.Cartesian
 using StaticArrays
 using TiledIteration
@@ -23,5 +25,8 @@ include("first.jl")
 include("second.jl")
 include("implicitint.jl")
 
+
+const VOFMethod = Vofinit
+const SimpleVOFMethod = SimpleVOF
 
 end
