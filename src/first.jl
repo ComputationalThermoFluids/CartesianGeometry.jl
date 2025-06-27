@@ -195,7 +195,7 @@ function integrate(::Type{Tuple{1}}, f, xyz, T, bc; method=:vofi)
 end
 
 # 1D surface
-function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{1}, _)
+function integrate!(moms, ::Type{Tuple{1}}, f, xyz::NTuple{1}, method=:vofi)
 
     input = only.(axes.(xyz))
     linear = LinearIndices(input)
